@@ -8,6 +8,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
@@ -100,6 +102,21 @@ export class NotificationService {
     const { status } = await Notifications.getPermissionsAsync();
     this.hasPermission = status === 'granted';
     return this.hasPermission;
+  }
+
+  // Check if notification permissions are granted
+  static async hasNotificationPermission(): Promise<boolean> {
+    try {
+      if (!Device.isDevice) {
+        return false;
+      }
+
+      const { status } = await Notifications.getPermissionsAsync();
+      return status === 'granted';
+    } catch (error) {
+      console.error('Error checking notification permissions:', error);
+      return false;
+    }
   }
 
   // Request notification permissions

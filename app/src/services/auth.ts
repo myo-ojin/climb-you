@@ -7,7 +7,7 @@ import {
   User as FirebaseUser,
   onAuthStateChanged,
   Unsubscribe
-} from 'firebase/auth/react-native';
+} from 'firebase/auth';
 import { getFirebaseAuth } from './firebase';
 import { User, LoginCredentials, SignupCredentials } from '../types/auth';
 

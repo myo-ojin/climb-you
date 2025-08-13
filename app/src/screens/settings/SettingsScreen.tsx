@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../contexts/AuthContext';
 import { SettingsService } from '../../services/settingsService';
 import { UserSettings, AppInfo } from '../../types/settings';
@@ -9,6 +10,7 @@ import Constants from 'expo-constants';
 const settingsService = new SettingsService();
 
 export const SettingsScreen: React.FC = () => {
+  const navigation = useNavigation();
   const { user, logout } = useAuth();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -146,8 +148,15 @@ export const SettingsScreen: React.FC = () => {
         {
           text: '再設定する',
           onPress: () => {
-            // TODO: Navigate to profiling screen
-            Alert.alert('開発中', 'この機能は開発中です');
+            // For MVP, show a dialog with instructions to access profiling
+            Alert.alert(
+              'プロファイル再設定',
+              '現在、プロファイル再設定は初回セットアップ時のみ利用可能です。\n\n再設定が必要な場合は、アプリを再インストールしてください。',
+              [{ text: 'OK' }]
+            );
+            
+            // TODO: Implement proper modal navigation to ProfilingScreen
+            // navigation.navigate('ProfileSetup' as never);
           },
         },
       ]

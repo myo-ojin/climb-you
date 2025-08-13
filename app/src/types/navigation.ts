@@ -1,4 +1,6 @@
-import { NavigatorScreenParams } from '@react-navigation/native';
+import { NavigatorScreenParams, CompositeScreenProps } from '@react-navigation/native';
+import { StackScreenProps } from '@react-navigation/stack';
+import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 
 // Auth Stack Navigation Types
 export type AuthStackParamList = {
@@ -25,15 +27,14 @@ export type RootStackParamList = {
 };
 
 // Screen Props Types
-export type AuthStackScreenProps<T extends keyof AuthStackParamList> = {
-  navigation: any;
-  route: any;
-};
+export type AuthStackScreenProps<T extends keyof AuthStackParamList> = 
+  StackScreenProps<AuthStackParamList, T>;
 
-export type MainTabScreenProps<T extends keyof MainTabParamList> = {
-  navigation: any;
-  route: any;
-};
+export type MainTabScreenProps<T extends keyof MainTabParamList> = 
+  CompositeScreenProps<
+    BottomTabScreenProps<MainTabParamList, T>,
+    StackScreenProps<RootStackParamList>
+  >;
 
 // Navigation Hook Types
 declare global {

@@ -45,6 +45,15 @@ export const ObstacleSchema = z.enum([
   'support_lack' // サポート不足
 ]);
 
+// Learning style analysis result type  
+export const LearningStyleAnalysisSchema = z.object({
+  motivation: MotivationTypeSchema,
+  pace: LearningPaceSchema,
+  obstacles: z.array(ObstacleSchema),
+});
+
+export type LearningStyleAnalysis = z.infer<typeof LearningStyleAnalysisSchema>;
+
 // Learning style questionnaire
 export const LearningStyleQuestionSchema = z.object({
   id: z.string(),

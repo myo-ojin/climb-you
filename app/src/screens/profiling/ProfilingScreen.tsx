@@ -15,7 +15,8 @@ import {
   LearningGoal, 
   AgeRange, 
   AGE_RANGE_OPTIONS,
-  GOAL_CATEGORY_OPTIONS 
+  GOAL_CATEGORY_OPTIONS,
+  LearningStyleAnalysis 
 } from '../../types/profiling';
 import { LEARNING_STYLE_QUESTIONS, analyzeLearningStyle } from '../../data/learningStyleQuestions';
 import { ProgressIndicator } from '../../components/ui/ProgressIndicator';
@@ -171,9 +172,9 @@ export const ProfilingScreen: React.FC = () => {
           questionId: answer.questionId,
           selectedOptions: answer.selectedOptions,
         })),
-        motivation: styleAnalysis.motivation as any,
-        pace: styleAnalysis.pace as any,
-        obstacles: styleAnalysis.obstacles as any,
+        motivation: styleAnalysis.motivation,
+        pace: styleAnalysis.pace,
+        obstacles: styleAnalysis.obstacles,
         completedAt: new Date().toISOString(),
         version: '1.0',
       };

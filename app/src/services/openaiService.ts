@@ -11,6 +11,11 @@ import { SecureStorageService } from './secureStorage';
 export class OpenAIService {
   private client: OpenAI | null = null;
   private config: OpenAIServiceConfig;
+  private usageStats: {
+    requestCount: number;
+    tokenCount: number;
+    lastResetDate: string;
+  };
 
   constructor() {
     this.config = {
@@ -19,6 +24,16 @@ export class OpenAIService {
       maxTokens: 1000,
       temperature: 0.7,
     };
+    
+    // Initialize usage stats
+    this.usageStats = {
+      requestCount: 0,
+      tokenCount: 0,
+      lastResetDate: new Date().toISOString().split('T')[0], // YYYY-MM-DD
+    };
+    
+    // Load saved stats
+    this.loadUsageStats();
   }
 
   /**
@@ -95,7 +110,10 @@ export class OpenAIService {
 
       const response = await this.client.chat.completions.create({
         model: requestConfig.model,
-        messages: messages,
+        messages: messages.map(msg => ({
+          role: msg.role as 'system' | 'user' | 'assistant',
+          content: msg.content || ''
+        })),
         max_tokens: requestConfig.maxTokens,
         temperature: requestConfig.temperature,
       });
@@ -105,6 +123,11 @@ export class OpenAIService {
 
       if (!content) {
         throw new Error('No content in OpenAI response');
+      }
+
+      // Record usage stats
+      if (result.usage) {
+        this.recordUsage(result.usage.total_tokens);
       }
 
       return content;
@@ -157,11 +180,67 @@ export class OpenAIService {
   }
 
   /**
-   * Get current usage stats (placeholder for future implementation)
+   * Get current usage stats
    */
-  getUsageStats(): { requestCount: number; tokenCount: number } {
-    // TODO: Implement usage tracking
-    return { requestCount: 0, tokenCount: 0 };
+  getUsageStats(): { requestCount: number; tokenCount: number; lastResetDate: string } {
+    // Reset daily stats if new day
+    this.resetDailyStatsIfNeeded();
+    return {
+      requestCount: this.usageStats.requestCount,
+      tokenCount: this.usageStats.tokenCount,
+      lastResetDate: this.usageStats.lastResetDate
+    };
+  }
+
+  /**
+   * Load usage stats from storage
+   */
+  private async loadUsageStats(): Promise<void> {
+    try {
+      const savedStats = await SecureStorageService.getUsageStats();
+      if (savedStats) {
+        this.usageStats = {
+          ...savedStats,
+          lastResetDate: savedStats.lastResetDate || new Date().toISOString().split('T')[0]
+        };
+        this.resetDailyStatsIfNeeded();
+      }
+    } catch (error) {
+      console.warn('Failed to load usage stats:', error);
+    }
+  }
+
+  /**
+   * Save usage stats to storage
+   */
+  private async saveUsageStats(): Promise<void> {
+    try {
+      await SecureStorageService.setUsageStats(this.usageStats);
+    } catch (error) {
+      console.warn('Failed to save usage stats:', error);
+    }
+  }
+
+  /**
+   * Reset daily stats if it's a new day
+   */
+  private resetDailyStatsIfNeeded(): void {
+    const today = new Date().toISOString().split('T')[0];
+    if (this.usageStats.lastResetDate !== today) {
+      this.usageStats.requestCount = 0;
+      this.usageStats.tokenCount = 0;
+      this.usageStats.lastResetDate = today;
+      this.saveUsageStats(); // Don't await to avoid blocking
+    }
+  }
+
+  /**
+   * Record API usage
+   */
+  private recordUsage(tokenCount: number): void {
+    this.usageStats.requestCount += 1;
+    this.usageStats.tokenCount += tokenCount;
+    this.saveUsageStats(); // Don't await to avoid blocking
   }
 
   /**

@@ -6,6 +6,11 @@ export const OpenAIMessageSchema = z.object({
   content: z.string(),
 });
 
+export const OpenAIChatMessageSchema = z.object({
+  role: z.enum(['system', 'user', 'assistant']),
+  content: z.string(),
+});
+
 export const OpenAICompletionSchema = z.object({
   id: z.string(),
   object: z.string(),

@@ -3,6 +3,7 @@ import Constants from 'expo-constants';
 
 // Secure Storage Keys
 const OPENAI_API_KEY = 'openai_api_key';
+const USAGE_STATS_KEY = 'openai_usage_stats';
 
 export class SecureStorageService {
   /**
@@ -68,5 +69,40 @@ export class SecureStorageService {
   static validateApiKey(apiKey: string): boolean {
     // OpenAI API keys start with 'sk-' and are typically 51 characters long
     return /^sk-[A-Za-z0-9]{48}$/.test(apiKey);
+  }
+
+  /**
+   * Store OpenAI usage stats securely
+   */
+  static async setUsageStats(stats: {
+    requestCount: number;
+    tokenCount: number;
+    lastResetDate: string;
+  }): Promise<void> {
+    try {
+      await SecureStore.setItemAsync(USAGE_STATS_KEY, JSON.stringify(stats));
+    } catch (error) {
+      throw new Error(`Failed to store usage stats: ${error}`);
+    }
+  }
+
+  /**
+   * Retrieve OpenAI usage stats from secure storage
+   */
+  static async getUsageStats(): Promise<{
+    requestCount: number;
+    tokenCount: number;
+    lastResetDate: string;
+  } | null> {
+    try {
+      const statsJson = await SecureStore.getItemAsync(USAGE_STATS_KEY);
+      if (statsJson) {
+        return JSON.parse(statsJson);
+      }
+      return null;
+    } catch (error) {
+      console.warn('Failed to retrieve usage stats:', error);
+      return null;
+    }
   }
 }

@@ -108,7 +108,7 @@ export class IntegrationTestSuite {
         { role: 'user' as const, content: 'Test message for integration test' }
       ];
       
-      const response = await this.openaiService.generateCompletion(testMessages);
+      const response = await this.openaiService.chatCompletion(testMessages);
       
       if (!response || response.length < 10) {
         throw new Error('OpenAI response too short or empty');
@@ -181,7 +181,7 @@ export class IntegrationTestSuite {
 
       // Create test profiling data
       const testProfilingData = {
-        ageRange: '20s' as const,
+        ageRange: '20代' as const,
         availableTimePerDay: 60,
         goals: [
           {
@@ -198,7 +198,7 @@ export class IntegrationTestSuite {
         ],
         motivation: 'achievement' as const,
         pace: 'moderate' as const,
-        obstacles: ['time_shortage'] as const,
+        obstacles: ['time_shortage' as const] as any,
         completedAt: new Date().toISOString(),
         version: '1.0'
       };
@@ -252,12 +252,12 @@ export class IntegrationTestSuite {
         throw new Error(`Quest generation failed: ${generationResult.error}`);
       }
 
-      if (!generationResult.quests || generationResult.quests.length === 0) {
+      if (!generationResult.quests || (generationResult as any).quests?.length === 0) {
         throw new Error('No quests generated');
       }
 
-      // Validate quest structure
-      const quest = generationResult.quests[0];
+      // Validate quest structure  
+      const quest = (generationResult as any).quests?.[0];
       if (!quest.id || !quest.title || !quest.category || !quest.difficulty) {
         throw new Error('Quest missing required fields');
       }
@@ -267,7 +267,7 @@ export class IntegrationTestSuite {
         passed: true,
         duration: Date.now() - startTime,
         details: {
-          questsGenerated: generationResult.quests.length,
+          questsGenerated: Array.isArray(generationResult.quests) ? generationResult.quests.length : 0,
           firstQuestTitle: quest.title,
           category: quest.category,
           difficulty: quest.difficulty
@@ -298,7 +298,7 @@ export class IntegrationTestSuite {
       const completionStats = await this.questManager.getCompletionStats(testUserId);
       
       // Should return valid stats structure even if empty
-      if (typeof completionStats.completionRate !== 'number') {
+      if (typeof completionStats.todayCompletionRate !== 'number') {
         throw new Error('Invalid completion stats structure');
       }
 
@@ -307,9 +307,9 @@ export class IntegrationTestSuite {
         passed: true,
         duration: Date.now() - startTime,
         details: {
-          completionRate: completionStats.completionRate,
-          totalGenerated: completionStats.totalGenerated || 0,
-          totalCompleted: completionStats.totalCompleted || 0
+          completionRate: completionStats.todayCompletionRate,
+          totalGenerated: completionStats.todayTotal || 0,
+          totalCompleted: completionStats.todayCompleted || 0
         }
       };
     } catch (error) {
@@ -378,9 +378,9 @@ export class IntegrationTestSuite {
       const settingsService = new SettingsService();
       
       // Test default settings generation
-      const defaultSettings = settingsService.getDefaultSettings();
+      const testSettings = await settingsService.getUserSettings('test-user');
       
-      if (!defaultSettings || typeof defaultSettings.notificationsEnabled !== 'boolean') {
+      if (!testSettings || typeof testSettings.notifications.enabled !== 'boolean') {
         throw new Error('Invalid default settings structure');
       }
 
@@ -389,8 +389,8 @@ export class IntegrationTestSuite {
         passed: true,
         duration: Date.now() - startTime,
         details: {
-          notificationsEnabled: defaultSettings.notificationsEnabled,
-          settingsVersion: defaultSettings.version
+          notificationsEnabled: testSettings.notifications.enabled,
+          settingsVersion: 'v1.0'
         }
       };
     } catch (error) {
