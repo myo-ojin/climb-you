@@ -22,7 +22,7 @@ export default function AppNavigator() {
           name="Main" 
           component={MainScreen}
           options={{
-            tabBarLabel: 'ホーム',
+            tabBarLabel: 'Home',
             tabBarIcon: ({ focused }) => (
               <Image 
                 source={require('../../assets/home-icon.png')} 
@@ -39,7 +39,7 @@ export default function AppNavigator() {
           name="Tasks" 
           component={TasksScreen}
           options={{
-            tabBarLabel: 'タスク',
+            tabBarLabel: 'Progress',
             tabBarIcon: ({ focused }) => (
               <Image 
                 source={require('../../assets/mountain-flag-icon.png')} 
@@ -56,7 +56,7 @@ export default function AppNavigator() {
           name="Settings" 
           component={TasksScreen}
           options={{
-            tabBarLabel: '設定',
+            tabBarLabel: 'Settings',
             tabBarIcon: ({ focused }) => (
               <Image 
                 source={require('../../assets/settings-icon.png')} 
