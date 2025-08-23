@@ -5,6 +5,7 @@ export interface Task {
   completed: boolean;
   createdAt: Date;
   completedAt?: Date;
+  isDummy?: boolean;
 }
 
 export interface User {
@@ -15,6 +16,9 @@ export interface User {
 }
 
 export type RootStackParamList = {
+  Main: undefined;
   Tasks: undefined;
-  Mountain: undefined;
+  AddTask: undefined;
+  Profile: undefined;
+  Settings: undefined;
 };
