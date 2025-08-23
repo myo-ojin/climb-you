@@ -7,9 +7,9 @@ const { height: screenHeight } = Dimensions.get('window');
 
 export default function MainScreen() {
   const [tasks, setTasks] = useState<Task[]>([
-    { id: '1', title: '朝のジョギング', description: '朝のジョギング', completed: false },
-    { id: '2', title: '英語の勉強', description: '英語の勉強', completed: true },
-    { id: '3', title: 'プロジェクトの企画書作成', description: 'プロジェクトの企画書作成', completed: false },
+    { id: '1', title: '朝のジョギング', description: '朝のジョギング', completed: false, createdAt: new Date() },
+    { id: '2', title: '英語の勉強', description: '英語の勉強', completed: true, createdAt: new Date() },
+    { id: '3', title: 'プロジェクトの企画書作成', description: 'プロジェクトの企画書作成', completed: false, createdAt: new Date() },
   ]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [progress, setProgress] = useState(0);
@@ -28,6 +28,7 @@ export default function MainScreen() {
         title: newTaskTitle.trim(),
         description: '',
         completed: false,
+        createdAt: new Date(),
       };
       setTasks([...tasks, newTask]);
       setNewTaskTitle('');
@@ -99,9 +100,9 @@ export default function MainScreen() {
       {/* Task Management Section - 2/3 of screen */}
       <View style={styles.taskSection}>
         <View style={styles.taskHeader}>
-          <Text style={styles.taskHeaderTitle}>今日のタスク</Text>
+          <Text style={styles.taskHeaderTitle}>Daily Quest</Text>
           <Text style={styles.taskHeaderSubtitle}>
-            {completedTasksCount}/{tasks.length} 完了
+            {completedTasksCount}/{tasks.length} Completed
           </Text>
         </View>
 
@@ -109,7 +110,7 @@ export default function MainScreen() {
         <View style={styles.addTaskContainer}>
           <TextInput
             style={styles.taskInput}
-            placeholder="新しいタスクを追加..."
+            placeholder="Add a new quest..."
             value={newTaskTitle}
             onChangeText={setNewTaskTitle}
             onSubmitEditing={addTask}
@@ -135,12 +136,13 @@ export default function MainScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#1a486c',
   },
   mountainSection: {
     height: screenHeight * 0.33, // 1/3 of screen
     paddingHorizontal: 16,
     paddingTop: 16,
+    paddingBottom: 16,
   },
   mountainCard: {
     flex: 1,
@@ -183,6 +185,8 @@ const styles = StyleSheet.create({
     flex: 1, // Takes remaining 2/3 of screen
     backgroundColor: 'white',
     paddingTop: 20,
+    marginHorizontal: 16,
+    borderRadius: 20,
   },
   taskHeader: {
     paddingHorizontal: 20,

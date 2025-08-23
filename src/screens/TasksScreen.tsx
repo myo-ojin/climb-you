@@ -135,18 +135,18 @@ export default function TasksScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'rgb(26,72,108)',
     padding: 20,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: 'white',
     marginBottom: 8,
   },
   progress: {
     fontSize: 16,
-    color: '#666',
+    color: '#E0E0E0',
     marginBottom: 20,
   },
   inputContainer: {

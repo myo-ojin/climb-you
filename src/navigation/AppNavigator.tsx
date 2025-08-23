@@ -52,6 +52,23 @@ export default function AppNavigator() {
             ),
           }}
         />
+        <Tab.Screen 
+          name="Settings" 
+          component={TasksScreen}
+          options={{
+            tabBarLabel: '設定',
+            tabBarIcon: ({ focused }) => (
+              <Image 
+                source={require('../../assets/settings-icon.png')} 
+                style={{ 
+                  width: 24, 
+                  height: 24,
+                  tintColor: focused ? '#007AFF' : '#666'
+                }} 
+              />
+            ),
+          }}
+        />
       </Tab.Navigator>
     </NavigationContainer>
   );

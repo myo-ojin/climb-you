@@ -17,4 +17,5 @@ export interface User {
 export type RootStackParamList = {
   Main: undefined;
   Tasks: undefined;
+  Settings: undefined;
 };

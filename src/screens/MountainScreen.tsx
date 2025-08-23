@@ -96,13 +96,13 @@ export default function MountainScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'rgb(26,72,108)',
   },
   header: {
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 20,
-    backgroundColor: 'white',
+    backgroundColor: 'rgb(64,99,131)',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -113,12 +113,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: 'white',
     marginBottom: 4,
   },
   level: {
     fontSize: 16,
-    color: '#666',
+    color: '#E0E0E0',
   },
   mountainContainer: {
     flex: 1,
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   },
   progressMessage: {
     fontSize: 16,
-    color: '#666',
+    color: '#E0E0E0',
     textAlign: 'center',
   },
   controlsContainer: {

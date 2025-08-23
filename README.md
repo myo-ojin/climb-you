@@ -38,3 +38,17 @@ src/
 - Task management
 - Interactive animations
 - Cross-platform support (iOS/Android)
+
+## Color Palette
+
+### 夜空 (Night Sky)
+- `rgb(26,72,108)`
+- `rgb(64,99,131)`
+
+### 山 (Mountain)
+- `rgb(16,60,97)`
+- `rgb(28,76,112)`
+
+### 太陽 (Sun)
+- `rgb(28,76,112)`
+- `rgb(252,222,160)`
