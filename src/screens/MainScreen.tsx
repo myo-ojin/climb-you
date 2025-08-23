@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Alert, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Alert, Dimensions, SafeAreaView } from 'react-native';
 import MountainAnimation from '../components/MountainAnimation';
 import { Task } from '../types';
 
@@ -78,7 +78,7 @@ export default function MainScreen() {
   const completedTasksCount = tasks.filter(task => task.completed).length;
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* Mountain Animation Section - 1/3 of screen */}
       <View style={styles.mountainSection}>
         <View style={styles.mountainCard}>
@@ -128,7 +128,7 @@ export default function MainScreen() {
           showsVerticalScrollIndicator={false}
         />
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
