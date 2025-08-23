@@ -189,12 +189,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   taskHeader: {
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-    backgroundColor: '#1a486c',
-    color: '#fff',
+    paddingHorizontal: 8,
   },
   taskHeaderTitle: {
     fontSize: 24,
@@ -209,7 +204,6 @@ const styles = StyleSheet.create({
 
   taskList: {
     flex: 1,
-    paddingHorizontal: 20,
     marginTop: 20,
   },
   row: {
