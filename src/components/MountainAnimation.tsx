@@ -93,13 +93,6 @@ export default function MountainAnimation({ progress }: MountainAnimationProps) 
                 isReached ? styles.stationReached : styles.stationUnreached,
                 isCurrent ? styles.stationCurrent : null,
               ]} />
-              <Text style={[
-                styles.stationText,
-                isReached ? styles.stationTextReached : styles.stationTextUnreached,
-                isCurrent ? styles.stationTextCurrent : null,
-              ]}>
-                {station}合目
-              </Text>
             </View>
           );
         })}

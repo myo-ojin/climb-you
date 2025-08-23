@@ -107,16 +107,6 @@ export default function MainScreen() {
       <View style={styles.mountainSection}>
         <View style={styles.mountainCard}>
           <MountainAnimation progress={progress} />
-          
-          {/* Current Status Overlay */}
-          <View style={styles.statusOverlay}>
-            <Text style={styles.currentStationText}>
-              {Math.floor(progress / 10) + 1}合目
-            </Text>
-            <Text style={styles.progressText}>
-              {Math.round(progress)}% 完了
-            </Text>
-          </View>
         </View>
       </View>
 
