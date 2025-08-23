@@ -55,25 +55,26 @@ export default function MainScreen() {
   };
 
   const renderTask = ({ item }: { item: Task }) => (
-    <View style={styles.taskItem}>
-      <TouchableOpacity
-        style={[styles.taskCheckbox, item.completed && styles.taskCheckboxCompleted]}
-        onPress={() => toggleTask(item.id)}
-      >
-        {item.completed && <Text style={styles.checkmark}>✓</Text>}
-      </TouchableOpacity>
+    <TouchableOpacity 
+      style={styles.taskItem}
+      onPress={() => toggleTask(item.id)}
+      onLongPress={() => deleteTask(item.id)}
+    >
+      <View style={styles.taskCardHeader}>
+        <TouchableOpacity
+          style={[styles.taskCheckbox, item.completed && styles.taskCheckboxCompleted]}
+          onPress={() => toggleTask(item.id)}
+        >
+          {item.completed && <Text style={styles.checkmark}>✓</Text>}
+        </TouchableOpacity>
+      </View>
       
-      <Text style={[styles.taskTitle, item.completed && styles.taskTitleCompleted]}>
-        {item.title}
-      </Text>
-      
-      <TouchableOpacity
-        style={styles.deleteButton}
-        onPress={() => deleteTask(item.id)}
-      >
-        <Text style={styles.deleteButtonText}>✕</Text>
-      </TouchableOpacity>
-    </View>
+      <View style={styles.taskContent}>
+        <Text style={[styles.taskTitle, item.completed && styles.taskTitleCompleted]}>
+          {item.title}
+        </Text>
+      </View>
+    </TouchableOpacity>
   );
 
   const completedTasksCount = tasks.filter(task => task.completed).length;
@@ -105,21 +106,7 @@ export default function MainScreen() {
             {completedTasksCount}/{tasks.length} Completed
           </Text>
         </View>
-
-        {/* Add New Task */}
-        <View style={styles.addTaskContainer}>
-          <TextInput
-            style={styles.taskInput}
-            placeholder="Add a new quest..."
-            value={newTaskTitle}
-            onChangeText={setNewTaskTitle}
-            onSubmitEditing={addTask}
-          />
-          <TouchableOpacity style={styles.addButton} onPress={addTask}>
-            <Text style={styles.addButtonText}>+</Text>
-          </TouchableOpacity>
-        </View>
-
+        
         {/* Task List */}
         <FlatList
           data={tasks}
@@ -127,6 +114,8 @@ export default function MainScreen() {
           renderItem={renderTask}
           style={styles.taskList}
           showsVerticalScrollIndicator={false}
+          numColumns={2}
+          columnWrapperStyle={styles.row}
         />
       </View>
     </SafeAreaView>
@@ -205,43 +194,37 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#fff',
   },
-  addTaskContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    gap: 12,
-  },
-  taskInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-  },
-  addButton: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 8,
-    paddingHorizontal: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addButtonText: {
-    color: 'white',
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
+
   taskList: {
     flex: 1,
     paddingHorizontal: 20,
+    marginTop: 20,
+  },
+  row: {
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
   },
   taskItem: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    marginHorizontal: 4,
+    flex: 1,
+    aspectRatio: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  taskCardHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    justifyContent: 'flex-end',
+    marginBottom: 8,
+  },
+  taskContent: {
+    flex: 1,
   },
   taskCheckbox: {
     width: 24,
@@ -249,7 +232,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#E0E0E0',
     borderRadius: 12,
-    marginRight: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -270,15 +252,5 @@ const styles = StyleSheet.create({
   taskTitleCompleted: {
     textDecorationLine: 'line-through',
     color: '#999',
-  },
-  deleteButton: {
-    padding: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  deleteButtonText: {
-    color: '#FF6B6B',
-    fontSize: 18,
-    fontWeight: 'bold',
   },
 });
