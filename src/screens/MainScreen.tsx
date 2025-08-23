@@ -183,7 +183,6 @@ const styles = StyleSheet.create({
   },
   taskSection: {
     flex: 1, // Takes remaining 2/3 of screen
-    backgroundColor: 'white',
     paddingTop: 20,
     marginHorizontal: 16,
     borderRadius: 20,
@@ -193,16 +192,18 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
+    backgroundColor: '#1a486c',
+    color: '#fff',
   },
   taskHeaderTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#fff',
     marginBottom: 4,
   },
   taskHeaderSubtitle: {
     fontSize: 16,
-    color: '#666',
+    color: '#fff',
   },
   addTaskContainer: {
     flexDirection: 'row',
@@ -218,7 +219,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    backgroundColor: '#F9F9F9',
   },
   addButton: {
     backgroundColor: '#4CAF50',
