@@ -10,6 +10,7 @@ export default function MainScreen() {
     { id: '1', title: '朝のジョギング', description: '朝のジョギング', completed: false, createdAt: new Date() },
     { id: '2', title: '英語の勉強', description: '英語の勉強', completed: true, createdAt: new Date() },
     { id: '3', title: 'プロジェクトの企画書作成', description: 'プロジェクトの企画書作成', completed: false, createdAt: new Date() },
+    { id: '4', title: 'プロジェクトの企画書作成', description: 'プロジェクトの企画書作成', completed: false, createdAt: new Date() },
   ]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [progress, setProgress] = useState(0);
@@ -54,30 +55,51 @@ export default function MainScreen() {
     );
   };
 
-  const renderTask = ({ item }: { item: Task }) => (
-    <TouchableOpacity 
-      style={styles.taskItem}
-      onPress={() => toggleTask(item.id)}
-      onLongPress={() => deleteTask(item.id)}
-    >
-      <View style={styles.taskCardHeader}>
-        <TouchableOpacity
-          style={[styles.taskCheckbox, item.completed && styles.taskCheckboxCompleted]}
-          onPress={() => toggleTask(item.id)}
-        >
-          {item.completed && <Text style={styles.checkmark}>✓</Text>}
-        </TouchableOpacity>
-      </View>
-      
-      <View style={styles.taskContent}>
-        <Text style={[styles.taskTitle, item.completed && styles.taskTitleCompleted]}>
-          {item.title}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+  const renderTask = ({ item }: { item: Task }) => {
+    if (item.isDummy) {
+      return (
+        <View style={styles.dummyTask} />
+      );
+    }
+
+    return (
+      <TouchableOpacity 
+        style={styles.taskItem}
+        onPress={() => toggleTask(item.id)}
+        onLongPress={() => deleteTask(item.id)}
+      >
+        <View style={styles.taskCardHeader}>
+          <TouchableOpacity
+            style={[styles.taskCheckbox, item.completed && styles.taskCheckboxCompleted]}
+            onPress={() => toggleTask(item.id)}
+          >
+            {item.completed && <Text style={styles.checkmark}>✓</Text>}
+          </TouchableOpacity>
+        </View>
+        
+        <View style={styles.taskContent}>
+          <Text style={[styles.taskTitle, item.completed && styles.taskTitleCompleted]}>
+            {item.title}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   const completedTasksCount = tasks.filter(task => task.completed).length;
+
+  // Add invisible dummy task if odd number of tasks
+  const tasksWithDummy = [...tasks];
+  if (tasks.length % 2 === 1) {
+    tasksWithDummy.push({
+      id: 'dummy',
+      title: '',
+      description: '',
+      completed: false,
+      createdAt: new Date(),
+      isDummy: true
+    });
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -109,7 +131,7 @@ export default function MainScreen() {
         
         {/* Task List */}
         <FlatList
-          data={tasks}
+          data={tasksWithDummy}
           keyExtractor={(item) => item.id}
           renderItem={renderTask}
           style={styles.taskList}
@@ -178,7 +200,7 @@ const styles = StyleSheet.create({
   },
   taskHeader: {
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
     backgroundColor: '#1a486c',
@@ -201,7 +223,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   row: {
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     paddingHorizontal: 4,
   },
   taskItem: {
@@ -217,6 +239,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  dummyTask: {
+    backgroundColor: '#1a486c',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    marginHorizontal: 4,
+    flex: 1,
+    aspectRatio: 1,
   },
   taskCardHeader: {
     flexDirection: 'row',

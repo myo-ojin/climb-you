@@ -5,6 +5,7 @@ export interface Task {
   completed: boolean;
   createdAt: Date;
   completedAt?: Date;
+  isDummy?: boolean;
 }
 
 export interface User {

@@ -66,36 +66,59 @@ export default function TasksScreen() {
     setTasks(tasks.filter(task => task.id !== taskId));
   };
 
-  const renderTask = ({ item }: { item: Task }) => (
-    <TouchableOpacity 
-      style={[styles.taskItem, item.completed && styles.completedTask]}
-      onPress={() => toggleTask(item.id)}
-      onLongPress={() => {
-        Alert.alert(
-          'Delete Task',
-          'Are you sure you want to delete this task?',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Delete', style: 'destructive', onPress: () => deleteTask(item.id) }
-          ]
-        );
-      }}
-    >
-      <View style={styles.taskContent}>
-        <Text style={[styles.taskTitle, item.completed && styles.completedText]}>
-          {item.title}
-        </Text>
-        <Text style={[styles.taskDescription, item.completed && styles.completedText]}>
-          {item.description}
-        </Text>
-      </View>
-      <View style={[styles.checkbox, item.completed && styles.checkedBox]}>
-        {item.completed && <Text style={styles.checkmark}>✓</Text>}
-      </View>
-    </TouchableOpacity>
-  );
+  const renderTask = ({ item }: { item: Task }) => {
+    if (item.isDummy) {
+      return (
+        <View style={styles.dummyTask} />
+      );
+    }
+
+    return (
+      <TouchableOpacity 
+        style={[styles.taskItem, item.completed && styles.completedTask]}
+        onPress={() => toggleTask(item.id)}
+        onLongPress={() => {
+          Alert.alert(
+            'Delete Task',
+            'Are you sure you want to delete this task?',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Delete', style: 'destructive', onPress: () => deleteTask(item.id) }
+            ]
+          );
+        }}
+      >
+        <View style={styles.taskHeader}>
+          <View style={[styles.checkbox, item.completed && styles.checkedBox]}>
+            {item.completed && <Text style={styles.checkmark}>✓</Text>}
+          </View>
+        </View>
+        <View style={styles.taskContent}>
+          <Text style={[styles.taskTitle, item.completed && styles.completedText]}>
+            {item.title}
+          </Text>
+          <Text style={[styles.taskDescription, item.completed && styles.completedText]}>
+            {item.description}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   const completedCount = tasks.filter(task => task.completed).length;
+
+  // Add invisible dummy task if odd number of tasks
+  const tasksWithDummy = [...tasks];
+  if (tasks.length % 2 === 1) {
+    tasksWithDummy.push({
+      id: 'dummy',
+      title: '',
+      description: '',
+      completed: false,
+      createdAt: new Date(),
+      isDummy: true
+    });
+  }
 
   return (
     <View style={styles.container}>
@@ -123,10 +146,12 @@ export default function TasksScreen() {
       </View>
 
       <FlatList
-        data={tasks}
+        data={tasksWithDummy}
         renderItem={renderTask}
         keyExtractor={(item) => item.id}
         style={styles.taskList}
+        numColumns={2}
+        columnWrapperStyle={styles.row}
       />
     </View>
   );
@@ -198,6 +223,20 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
     aspectRatio: 1,
   },
+  dummyTask: {
+    backgroundColor: 'rgb(26,72,108)',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+    marginHorizontal: 4,
+    flex: 1,
+    aspectRatio: 1,
+  },
+  taskHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginBottom: 8,
+  },
   completedTask: {
     opacity: 0.7,
   },
@@ -232,5 +271,9 @@ const styles = StyleSheet.create({
   checkmark: {
     color: 'white',
     fontWeight: 'bold',
+  },
+  row: {
+    justifyContent: 'flex-start',
+    paddingHorizontal: 4,
   },
 });
