@@ -4,7 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { RootStackParamList } from '../types';
 import TasksScreen from '../screens/TasksScreen';
-import MountainScreen from '../screens/MountainScreen';
+import MainScreen from '../screens/MainScreen';
 
 const Tab = createBottomTabNavigator<RootStackParamList>();
 
@@ -19,22 +19,22 @@ export default function AppNavigator() {
         }}
       >
         <Tab.Screen 
-          name="Tasks" 
-          component={TasksScreen}
+          name="Main" 
+          component={MainScreen}
           options={{
-            tabBarLabel: 'Tasks',
+            tabBarLabel: 'ホーム',
             tabBarIcon: ({ color }) => (
-              <TaskIcon color={color} />
+              <MountainIcon color={color} />
             ),
           }}
         />
         <Tab.Screen 
-          name="Mountain" 
-          component={MountainScreen}
+          name="Tasks" 
+          component={TasksScreen}
           options={{
-            tabBarLabel: 'Mountain',
+            tabBarLabel: 'タスク',
             tabBarIcon: ({ color }) => (
-              <MountainIcon color={color} />
+              <TaskIcon color={color} />
             ),
           }}
         />
@@ -76,3 +76,4 @@ function MountainIcon({ color }: { color: string }) {
     </View>
   );
 }
+

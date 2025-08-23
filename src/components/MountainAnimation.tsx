@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Animated, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, Animated, StyleSheet, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -70,21 +70,53 @@ export default function MountainAnimation({ progress }: MountainAnimationProps) 
         <View style={[styles.mountain, styles.frontMountain]} />
       </View>
 
-      {/* Climbing path */}
-      <View style={styles.pathContainer}>
-        {[...Array(10)].map((_, index) => (
-          <View
-            key={index}
-            style={[
-              styles.pathDot,
-              {
-                bottom: 50 + (index * (screenHeight * 0.06)),
-                left: screenWidth * (0.1 + (index % 2 === 0 ? 0.1 : 0.3) + (index * 0.05)),
-                opacity: progress >= (index + 1) * 10 ? 1 : 0.3,
-              }
-            ]}
-          />
-        ))}
+      {/* Mountain stations (合目) */}
+      <View style={styles.stationsContainer}>
+        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((station, index) => {
+          const stationProgress = station * 10;
+          const isReached = progress >= stationProgress;
+          const isCurrent = progress >= (station - 1) * 10 && progress < stationProgress;
+          
+          return (
+            <View
+              key={station}
+              style={[
+                styles.station,
+                {
+                  bottom: 50 + (index * (screenHeight * 0.055)),
+                  left: screenWidth * (0.15 + (index % 2 === 0 ? 0 : 0.4) + (index * 0.03)),
+                }
+              ]}
+            >
+              <View style={[
+                styles.stationMarker,
+                isReached ? styles.stationReached : styles.stationUnreached,
+                isCurrent ? styles.stationCurrent : null,
+              ]} />
+              <Text style={[
+                styles.stationText,
+                isReached ? styles.stationTextReached : styles.stationTextUnreached,
+                isCurrent ? styles.stationTextCurrent : null,
+              ]}>
+                {station}合目
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+      
+      {/* Current position indicator */}
+      <View style={[
+        styles.currentPositionContainer,
+        {
+          bottom: 50 + ((progress / 10) * (screenHeight * 0.055)),
+          left: screenWidth * (0.05 + ((progress / 100) * 0.5)),
+        }
+      ]}>
+        <View style={styles.currentPositionArrow} />
+        <Text style={styles.currentPositionText}>
+          現在位置: {Math.floor(progress / 10) + 1}合目への道のり
+        </Text>
       </View>
 
       {/* Climber */}
@@ -114,11 +146,15 @@ export default function MountainAnimation({ progress }: MountainAnimationProps) 
         <View style={styles.flagCloth} />
       </Animated.View>
 
-      {/* Progress indicator */}
+      {/* Enhanced progress indicator */}
       <View style={styles.progressContainer}>
+        <Text style={styles.progressLabel}>登山進捗: {Math.round(progress)}%</Text>
         <View style={styles.progressBar}>
           <View style={[styles.progressFill, { width: `${progress}%` }]} />
         </View>
+        <Text style={styles.progressStationLabel}>
+          {progress >= 100 ? '頂上到達！' : `次の目標: ${Math.floor(progress / 10) + 1}合目`}
+        </Text>
       </View>
     </View>
   );
@@ -165,17 +201,76 @@ const styles = StyleSheet.create({
     left: 0,
     transform: [{ skewX: '20deg' }],
   },
-  pathContainer: {
+  stationsContainer: {
     position: 'absolute',
     width: '100%',
     height: '100%',
   },
-  pathDot: {
+  station: {
     position: 'absolute',
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#228B22',
+    alignItems: 'center',
+    minWidth: 60,
+  },
+  stationMarker: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    marginBottom: 4,
+    borderWidth: 2,
+  },
+  stationReached: {
+    backgroundColor: '#4CAF50',
+    borderColor: '#2E7D32',
+  },
+  stationUnreached: {
+    backgroundColor: '#E0E0E0',
+    borderColor: '#BDBDBD',
+  },
+  stationCurrent: {
+    backgroundColor: '#FF9800',
+    borderColor: '#F57C00',
+    transform: [{ scale: 1.3 }],
+  },
+  stationText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  stationTextReached: {
+    color: '#2E7D32',
+  },
+  stationTextUnreached: {
+    color: '#9E9E9E',
+  },
+  stationTextCurrent: {
+    color: '#F57C00',
+    fontSize: 12,
+  },
+  currentPositionContainer: {
+    position: 'absolute',
+    alignItems: 'center',
+    maxWidth: screenWidth * 0.4,
+  },
+  currentPositionArrow: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 8,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#FF5722',
+    marginBottom: 4,
+  },
+  currentPositionText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#FF5722',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    textAlign: 'center',
   },
   climber: {
     position: 'absolute',
@@ -221,15 +316,36 @@ const styles = StyleSheet.create({
     bottom: 20,
     left: 20,
     right: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  progressLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 8,
   },
   progressBar: {
-    height: 8,
+    height: 12,
     backgroundColor: '#E0E0E0',
-    borderRadius: 4,
+    borderRadius: 6,
     overflow: 'hidden',
+    marginBottom: 8,
   },
   progressFill: {
     height: '100%',
     backgroundColor: '#4CAF50',
+  },
+  progressStationLabel: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
   },
 });
