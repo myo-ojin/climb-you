@@ -1,0 +1,20 @@
+export interface Task {
+  id: string;
+  title: string;
+  description: string;
+  completed: boolean;
+  createdAt: Date;
+  completedAt?: Date;
+}
+
+export interface User {
+  id: string;
+  name: string;
+  level: number;
+  progress: number;
+}
+
+export type RootStackParamList = {
+  Tasks: undefined;
+  Mountain: undefined;
+};
