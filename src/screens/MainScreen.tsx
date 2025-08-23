@@ -81,16 +81,18 @@ export default function MainScreen() {
     <View style={styles.container}>
       {/* Mountain Animation Section - 1/3 of screen */}
       <View style={styles.mountainSection}>
-        <MountainAnimation progress={progress} />
-        
-        {/* Current Status Overlay */}
-        <View style={styles.statusOverlay}>
-          <Text style={styles.currentStationText}>
-            {Math.floor(progress / 10) + 1}合目
-          </Text>
-          <Text style={styles.progressText}>
-            {Math.round(progress)}% 完了
-          </Text>
+        <View style={styles.mountainCard}>
+          <MountainAnimation progress={progress} />
+          
+          {/* Current Status Overlay */}
+          <View style={styles.statusOverlay}>
+            <Text style={styles.currentStationText}>
+              {Math.floor(progress / 10) + 1}合目
+            </Text>
+            <Text style={styles.progressText}>
+              {Math.round(progress)}% 完了
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -137,7 +139,20 @@ const styles = StyleSheet.create({
   },
   mountainSection: {
     height: screenHeight * 0.33, // 1/3 of screen
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  mountainCard: {
+    flex: 1,
+    backgroundColor: 'white',
+    borderRadius: 20,
     position: 'relative',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
   statusOverlay: {
     position: 'absolute',
