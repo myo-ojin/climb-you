@@ -218,6 +218,7 @@ const styles = StyleSheet.create({
   },
   taskItem: {
     backgroundColor: 'white',
+    opacity: 0.8,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
