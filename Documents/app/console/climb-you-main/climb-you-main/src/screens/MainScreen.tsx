@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Alert, Dimensions, SafeAreaView } from 'react-native';
 import MountainAnimation from '../components/MountainAnimation';
+import EnhancedMountainAnimation from '../components/EnhancedMountainAnimation';
 import { Task } from '../types';
 
 const { height: screenHeight } = Dimensions.get('window');
@@ -14,6 +15,7 @@ export default function MainScreen() {
   ]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [progress, setProgress] = useState(0);
+  const [useEnhancedAnimation, setUseEnhancedAnimation] = useState(true); // テスト用切り替え
 
   useEffect(() => {
     const completedTasks = tasks.filter(task => task.completed).length;
@@ -106,8 +108,25 @@ export default function MainScreen() {
       {/* Mountain Animation Section - 1/3 of screen */}
       <View style={styles.mountainSection}>
         <View style={styles.mountainCard}>
-          <MountainAnimation progress={progress} />
+          {useEnhancedAnimation ? (
+            <EnhancedMountainAnimation 
+              progress={progress / 100} 
+              checkpoints={[0.25, 0.5, 0.75, 1.0]}
+            />
+          ) : (
+            <MountainAnimation progress={progress} />
+          )}
         </View>
+        
+        {/* テスト用切り替えボタン */}
+        <TouchableOpacity
+          style={styles.animationToggleButton}
+          onPress={() => setUseEnhancedAnimation(!useEnhancedAnimation)}
+        >
+          <Text style={styles.animationToggleText}>
+            {useEnhancedAnimation ? '🎬 Enhanced' : '⚡ Classic'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Task Management Section - 2/3 of screen */}
@@ -284,5 +303,20 @@ const styles = StyleSheet.create({
   taskTitleCompleted: {
     textDecorationLine: 'line-through',
     color: '#B9C3CF',
+  },
+  animationToggleButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(243, 231, 201, 0.9)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    zIndex: 10,
+  },
+  animationToggleText: {
+    color: '#0F2A44',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 });
