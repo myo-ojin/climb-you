@@ -10,7 +10,9 @@ import Svg, {
   Path, 
   G,
   Filter,
-  FeDropShadow
+  FeDropShadow,
+  Ellipse,
+  Line
 } from 'react-native-svg';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -268,10 +270,51 @@ export default function EnhancedMountainAnimation({
           transform={`translate(${hikerPosition.x}, ${hikerPosition.y}) rotate(${hikerPosition.angle})`}
           filter="url(#shadow)"
         >
-          {/* シンプルなハイカーシルエット */}
-          <Circle cx="0" cy="-30" r="8" fill="#FF4444" />
-          <Rect x="-6" y="-22" width="12" height="20" rx="6" fill="#FF4444" />
-          <Circle cx="0" cy="-35" r="5" fill="#FFDBAC" />
+          {/* 参考元 hiker.svg の完全移植 (60x72 viewBox="0 0 60 72") */}
+          <G transform="translate(0, -36)">
+            {/* Head with more realistic proportions */}
+            <Ellipse cx="1" cy="-28" rx="5.5" ry="6.5" fill="#2d5a7b"/>
+            
+            {/* Hat/Cap with bill */}
+            <Ellipse cx="1" cy="-30" rx="7" ry="4" fill="#1e3a5f"/>
+            <Ellipse cx="4" cy="-30" rx="3" ry="2" fill="#1e3a5f"/>
+            
+            {/* Large backpack (more prominent like reference) */}
+            <Path d="M-12,-22 Q-15,-26 -12,-30 Q-8,-32 -4,-30 Q-2,-28 -2,-20 Q-2,-8 -4,-4 Q-8,-2 -12,-4 Q-15,-8 -12,-22 Z" fill="#2d5a7b"/>
+            <Rect x="-11" y="-25" width="2" height="8" fill="#1e3a5f"/>
+            <Circle cx="-8" cy="-24" r="1" fill="#1e3a5f"/>
+            
+            {/* Body/Torso (more athletic build) */}
+            <Path d="M-8,-18 Q-10,-12 -8,-6 Q-6,-2 0,0 Q6,-2 8,-6 Q10,-12 8,-18 Q4,-20 -4,-20 Q-8,-20 -8,-18 Z" fill="#2d5a7b"/>
+            
+            {/* Left arm reaching forward with hiking pole */}
+            <Path d="M-8,-14 Q-14,-10 -16,-4 Q-18,2 -16,8 Q-14,12 -12,14" stroke="#2d5a7b" strokeWidth="5" fill="none" strokeLinecap="round"/>
+            
+            {/* Right arm swinging */}
+            <Path d="M8,-14 Q12,-10 14,-4 Q15,2 12,8 Q10,12 8,14" stroke="#2d5a7b" strokeWidth="5" fill="none" strokeLinecap="round"/>
+            
+            {/* Hiking stick (more prominent) */}
+            <Line x1="-17" y1="16" x2="-14" y2="-8" stroke="#8b4513" strokeWidth="2" strokeLinecap="round"/>
+            <Circle cx="-14.5" cy="-6" r="1.5" fill="#4a4a4a"/>
+            
+            {/* Left leg (stepping forward, bent knee) */}
+            <Path d="M-4,2 Q-8,8 -10,16 Q-12,24 -8,30 Q-6,32 -4,30" stroke="#2d5a7b" strokeWidth="6" fill="none" strokeLinecap="round"/>
+            
+            {/* Right leg (pushing off, more extended) */}
+            <Path d="M4,2 Q8,10 10,18 Q12,26 8,32 Q6,34 4,32" stroke="#2d5a7b" strokeWidth="6" fill="none" strokeLinecap="round"/>
+            
+            {/* Boots (more realistic) */}
+            <Ellipse cx="-6" cy="32" rx="4" ry="2.5" fill="#1e3a5f"/>
+            <Ellipse cx="6" cy="34" rx="4" ry="2.5" fill="#1e3a5f"/>
+            
+            {/* Backpack straps */}
+            <Path d="M-4,-18 Q-2,-16 0,-18 Q2,-16 4,-18" stroke="#1e3a5f" strokeWidth="2" fill="none"/>
+            <Line x1="-2" y1="-18" x2="-1" y2="-8" stroke="#1e3a5f" strokeWidth="2"/>
+            <Line x1="2" y1="-18" x2="1" y2="-8" stroke="#1e3a5f" strokeWidth="2"/>
+            
+            {/* Belt/waist pack */}
+            <Ellipse cx="0" cy="-4" rx="10" ry="2" fill="#1e3a5f"/>
+          </G>
         </G>
         </Svg>
       )}
