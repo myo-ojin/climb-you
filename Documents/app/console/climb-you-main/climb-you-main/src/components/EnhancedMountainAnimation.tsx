@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
+import { View, StyleSheet, Dimensions, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { animate, useReducedMotion } from 'framer-motion';
 import Svg, { 
   Defs, 
@@ -45,8 +45,8 @@ type AnimationState = 'idle' | 'zooming-in' | 'moving' | 'zooming-out';
 // ★道の形を山の輪郭に沿うように変更
 const TRAIL_PATH = 'M80,560 C 120,540 160,510 220,490 C 280,470 340,440 400,410 C 460,380 520,340 580,300 C 640,260 680,220 720,180 C 750,160 770,140 780,120 C 785,115 790,110 795,105';
 
-// 高密度パス補間システム (getPointAtLength相当の精度を実現)
-const generateHighDensityPath = (pathString: string, density: number = 1000): Array<{x: number, y: number, distance: number}> => {
+// 超高密度パス補間システム - 極限の滑らかさを実現
+const generateHighDensityPath = (pathString: string, density: number = 5000): Array<{x: number, y: number, distance: number}> => {
   // ベジエ曲線の数学的計算で高密度ポイントを生成
   const points: Array<{x: number, y: number, distance: number}> = [];
   
@@ -68,16 +68,19 @@ const generateHighDensityPath = (pathString: string, density: number = 1000): Ar
     for (let i = 0; i <= segmentPoints; i++) {
       const t = i / segmentPoints;
       
-      // 3次ベジエ曲線の計算
-      const x = Math.pow(1-t, 3) * segment.start.x +
-                3 * Math.pow(1-t, 2) * t * segment.cp1.x +
-                3 * (1-t) * Math.pow(t, 2) * segment.cp2.x +
-                Math.pow(t, 3) * segment.end.x;
+      // より滑らかな補間のためのスプライン調整
+      const smoothT = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
       
-      const y = Math.pow(1-t, 3) * segment.start.y +
-                3 * Math.pow(1-t, 2) * t * segment.cp1.y +
-                3 * (1-t) * Math.pow(t, 2) * segment.cp2.y +
-                Math.pow(t, 3) * segment.end.y;
+      // 超滑らか3次ベジエ曲線計算（スムーズT使用）
+      const x = Math.pow(1-smoothT, 3) * segment.start.x +
+                3 * Math.pow(1-smoothT, 2) * smoothT * segment.cp1.x +
+                3 * (1-smoothT) * Math.pow(smoothT, 2) * segment.cp2.x +
+                Math.pow(smoothT, 3) * segment.end.x;
+      
+      const y = Math.pow(1-smoothT, 3) * segment.start.y +
+                3 * Math.pow(1-smoothT, 2) * smoothT * segment.cp1.y +
+                3 * (1-smoothT) * Math.pow(smoothT, 2) * segment.cp2.y +
+                Math.pow(smoothT, 3) * segment.end.y;
       
       // 前のポイントからの距離を計算
       if (points.length > 0) {
@@ -126,25 +129,36 @@ const getPointAtLength = (distance: number): {x: number, y: number} => {
   };
 };
 
-// 境界条件を考慮した角度計算（参考元完全移植）
+// 境界条件を考慮した超滑らか角度計算
 const calculateAngleWithBoundaryConditions = (targetDistance: number): number => {
   let angle: number;
   
-  if (targetDistance < 3) {
-    // 開始点近く：少し先の点を使用
+  // より細かい距離でより滑らかな角度計算
+  const lookAhead = 1.5; // 先読み距離を短縮
+  const lookBehind = 1.5; // 後読み距離も短縮
+  
+  if (targetDistance < 2) {
+    // 開始点近く：より細かい先読み
     const pt = getPointAtLength(targetDistance);
-    const pt2 = getPointAtLength(Math.min(TOTAL_PATH_LENGTH, 5));
+    const pt2 = getPointAtLength(Math.min(TOTAL_PATH_LENGTH, targetDistance + lookAhead));
     angle = (Math.atan2(pt2.y - pt.y, pt2.x - pt.x) * 180) / Math.PI;
-  } else if (targetDistance > TOTAL_PATH_LENGTH - 3) {
-    // 終点近く：少し前の点を使用
+  } else if (targetDistance > TOTAL_PATH_LENGTH - 2) {
+    // 終点近く：より細かい後読み
     const pt = getPointAtLength(targetDistance);
-    const prevPt = getPointAtLength(Math.max(0, targetDistance - 5));
+    const prevPt = getPointAtLength(Math.max(0, targetDistance - lookBehind));
     angle = (Math.atan2(pt.y - prevPt.y, pt.x - prevPt.x) * 180) / Math.PI;
   } else {
-    // 通常：前方の点を使用
+    // 通常：前後の点を使って平均化でより滑らか
     const pt = getPointAtLength(targetDistance);
-    const pt2 = getPointAtLength(Math.min(TOTAL_PATH_LENGTH, targetDistance + 2.0));
-    angle = (Math.atan2(pt2.y - pt.y, pt2.x - pt.x) * 180) / Math.PI;
+    const ptForward = getPointAtLength(Math.min(TOTAL_PATH_LENGTH, targetDistance + lookAhead));
+    const ptBackward = getPointAtLength(Math.max(0, targetDistance - lookBehind));
+    
+    // 前方と後方の角度を計算して平均化
+    const forwardAngle = Math.atan2(ptForward.y - pt.y, ptForward.x - pt.x);
+    const backwardAngle = Math.atan2(pt.y - ptBackward.y, pt.x - ptBackward.x);
+    const averageAngle = (forwardAngle + backwardAngle) / 2;
+    
+    angle = (averageAngle * 180) / Math.PI;
   }
   
   return angle;
@@ -158,6 +172,13 @@ export default function EnhancedMountainAnimation({
   const [isMounted, setIsMounted] = useState(false);
   const prefersReducedMotion = useReducedMotion() || false;
 
+  // Android用のLayoutAnimation有効化
+  useEffect(() => {
+    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+  }, []);
+
   // アニメーション制御
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [zoomCenter, setZoomCenter] = useState<{ x: number; y: number }>({ x: 400, y: 300 });
@@ -166,6 +187,18 @@ export default function EnhancedMountainAnimation({
 
   // パス関連（React Native用に簡略化）
   const [hikerPosition, setHikerPosition] = useState<HikerPosition>({ x: 80, y: 560, angle: 0 });
+  
+  // スムージング用の前回位置記録
+  const [previousPosition, setPreviousPosition] = useState<HikerPosition>({ x: 80, y: 560, angle: 0 });
+  
+  // 位置スムージング関数（慣性効果付き）
+  const smoothPosition = (newPos: HikerPosition, prevPos: HikerPosition, factor: number = 0.15): HikerPosition => {
+    return {
+      x: prevPos.x + (newPos.x - prevPos.x) * factor,
+      y: prevPos.y + (newPos.y - prevPos.y) * factor,
+      angle: prevPos.angle + (newPos.angle - prevPos.angle) * factor,
+    };
+  };
 
   useEffect(() => {
     setIsMounted(true);
@@ -213,8 +246,8 @@ export default function EnhancedMountainAnimation({
       console.log('🎬 ステップ1: ズームイン開始');
       
       animate(zoomLevel, 3, {
-        duration: 0.7 / 0.75, // 0.75倍速、0.1秒短縮 = 0.93秒
-        ease: [0.2, 0, 0.3, 1],
+        duration: 1.2, // よりゆっくりと滑らかなズームイン
+        ease: [0.25, 0.46, 0.45, 0.94], // easeOutCubic風でより自然
         onUpdate: setZoomLevel,
         onComplete: () => {
           // 0.2秒の小休止後に移動許可
@@ -230,15 +263,15 @@ export default function EnhancedMountainAnimation({
             setAnimationState('zooming-out');
             
             animate(zoomLevel, 1, {
-              duration: 1.8, // ズームアウトも少しゆっくりに
-              ease: [0.4, 0, 0.2, 1],
+              duration: 1.8, // ズームインと調和した時間
+              ease: [0.25, 0.46, 0.45, 0.94], // ズームインと同じeaseOutCubic風で統一感
               onUpdate: setZoomLevel,
               onComplete: () => {
                 console.log('🎬 完了: 通常状態に戻る');
                 setAnimationState('idle');
               }
             });
-          }, 3500 + 200); // 移動時間3.5秒 + 0.2秒遅延 = 3.7秒後
+          }, 3500 + 250); // 移動時間3.5秒 + 0.25秒遅延 = 3.75秒後（自然なタイミング）
         }
       });
     }
@@ -256,27 +289,44 @@ export default function EnhancedMountainAnimation({
     const target = progress * TOTAL_PATH_LENGTH;
 
     if (!isMounted || prefersReducedMotion) {
-      // 即座に位置更新
+      // 即座に位置更新（モーション削減時もスムージング適用）
       const pt = getPointAtLength(target);
       const angle = calculateAngleWithBoundaryConditions(target);
-      setHikerPosition({ x: pt.x, y: pt.y, angle });
+      const newPosition = { x: pt.x, y: pt.y, angle };
+      
+      // モーション削減時も最低限のスムージング
+      const smoothed = smoothPosition(newPosition, hikerPosition, 0.7);
+      setHikerPosition(smoothed);
       return;
     }
 
-    // 長期目標用のゆっくりとした移動（日々のクエストではなく長期達成用）
+    // 最高品質の滑らかな移動（複数層最適化）
     const currentDistance = lastProgress * TOTAL_PATH_LENGTH;
     const ctrl = animate(currentDistance, target, {
-      duration: 3.5, // 大幅に遅くして長期目標感を演出（3.5秒）
-      ease: [0.25, 0.1, 0.25, 1], // よりゆったりとしたイージング
+      duration: 3.5,
+      ease: [0.16, 1, 0.3, 1], // easeOutExpo（最も滑らか）
       onUpdate: (L) => {
-        const pt = getPointAtLength(L);
-        const angle = calculateAngleWithBoundaryConditions(L);
-        setHikerPosition({ x: pt.x, y: pt.y, angle });
+        const rawPt = getPointAtLength(L);
+        const rawAngle = calculateAngleWithBoundaryConditions(L);
+        const rawPosition = { x: rawPt.x, y: rawPt.y, angle: rawAngle };
         
-        // ズーム中はハイカーと一緒にズーム中心も移動
-        if (zoomLevel > 1) {
-          setZoomCenter({ x: pt.x, y: pt.y });
-        }
+        // 3段階スムージング適用
+        const smoothedOnce = smoothPosition(rawPosition, previousPosition, 0.3);
+        const smoothedTwice = smoothPosition(smoothedOnce, hikerPosition, 0.5); 
+        const finalPosition = smoothPosition(smoothedTwice, hikerPosition, 0.8);
+        
+        // 前回位置更新
+        setPreviousPosition(hikerPosition);
+        
+        // requestAnimationFrameで最高の滑らかさ
+        requestAnimationFrame(() => {
+          setHikerPosition(finalPosition);
+          
+          // ズーム中はハイカーと一緒にズーム中心も移動
+          if (zoomLevel > 1) {
+            setZoomCenter({ x: finalPosition.x, y: finalPosition.y });
+          }
+        });
       },
     });
     return () => ctrl.stop();
