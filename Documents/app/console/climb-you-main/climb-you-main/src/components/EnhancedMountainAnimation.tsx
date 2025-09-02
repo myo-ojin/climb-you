@@ -135,7 +135,7 @@ export default function EnhancedMountainAnimation({
       setHikerPosition(calculateHikerPosition(progress));
     }
     setLastProgress(progress);
-  }, [progress, lastProgress, prefersReducedMotion]);
+  }, [progress, lastProgress, prefersReducedMotion, calculateHikerPosition, zoomLevel]);
 
   // 視差効果の計算（最適化）
   const parallax = useMemo(() => {
@@ -154,22 +154,21 @@ export default function EnhancedMountainAnimation({
 
   const reachedCheckpoints = checkpointPositions.filter(cp => progress >= cp.progress - 0.001).map(cp => cp.progress);
 
-  if (!isMounted) {
-    return <View style={styles.container} />;
-  }
+  // 早期リターンを削除し、条件レンダリングに変更
 
   return (
     <View style={styles.container}>
-      <Svg
-        width="100%"
-        height="100%"
-        viewBox={zoomLevel > 1 ? "-200 -150 1200 900" : "0 0 800 600"}
-        style={{
-          transform: [
-            { scale: zoomLevel },
-          ],
-        }}
-      >
+      {isMounted && (
+        <Svg
+          width="100%"
+          height="100%"
+          viewBox={zoomLevel > 1 ? "-200 -150 1200 900" : "0 0 800 600"}
+          style={{
+            transform: [
+              { scale: zoomLevel },
+            ],
+          }}
+        >
         {/* ====== Defs ====== */}
         <Defs>
           {/* 空のグラデーション */}
@@ -272,7 +271,8 @@ export default function EnhancedMountainAnimation({
           <Rect x="-6" y="-22" width="12" height="20" rx="6" fill="#FF4444" />
           <Circle cx="0" cy="-35" r="5" fill="#FFDBAC" />
         </G>
-      </Svg>
+        </Svg>
+      )}
     </View>
   );
 }
