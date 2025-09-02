@@ -20,8 +20,9 @@ export default function MainScreen() {
   useEffect(() => {
     const completedTasks = tasks.filter(task => task.completed).length;
     const totalTasks = tasks.length;
-    const calculatedProgress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
-    setProgress(Math.min(calculatedProgress, 100));
+    // 長期目標用：日々のタスク完了では山頂まで到達しない（最大30%程度）
+    const calculatedProgress = totalTasks > 0 ? (completedTasks / totalTasks) * 30 : 0; // 30%に制限
+    setProgress(Math.min(calculatedProgress, 30)); // 日々のクエストでは30%まで
   }, [tasks]);
 
   const addTask = () => {

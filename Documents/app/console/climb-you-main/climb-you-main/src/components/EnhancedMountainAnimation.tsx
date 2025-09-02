@@ -182,9 +182,9 @@ export default function EnhancedMountainAnimation({
     };
   }, []);
 
-  // 進捗変化を検知（ズームトリガー用）- 参考元完全移植
+  // 進捗変化を検知（長期目標用・より小さな変化でもズーム）
   useEffect(() => {
-    if (progress > lastProgress && progress - lastProgress >= 0.05) {
+    if (progress > lastProgress && progress - lastProgress >= 0.02) { // 2%の変化でズーム（長期目標らしく細かく）
       console.log('🔍 ズーム条件達成:', {
         前回: (lastProgress * 100).toFixed(0) + '%',
         現在: (progress * 100).toFixed(0) + '%',
@@ -223,14 +223,14 @@ export default function EnhancedMountainAnimation({
             setAnimationState('moving');
           }, 200);
           
-          // 移動完了を待つ（0.2秒の遅延を考慮）
+          // 長期目標用の移動時間に合わせて待機時間を調整
           setTimeout(() => {
             // ステップ3: ズームアウト開始
             console.log('🎬 ステップ3: ズームアウト開始');
             setAnimationState('zooming-out');
             
             animate(zoomLevel, 1, {
-              duration: 1.1 / 0.75, // 0.75倍速、0.1秒短縮 = 1.47秒
+              duration: 1.8, // ズームアウトも少しゆっくりに
               ease: [0.4, 0, 0.2, 1],
               onUpdate: setZoomLevel,
               onComplete: () => {
@@ -238,7 +238,7 @@ export default function EnhancedMountainAnimation({
                 setAnimationState('idle');
               }
             });
-          }, 1000 / 0.75 + 200); // 移動時間1.33秒 + 0.2秒遅延 = 1.53秒後
+          }, 3500 + 200); // 移動時間3.5秒 + 0.2秒遅延 = 3.7秒後
         }
       });
     }
@@ -263,11 +263,11 @@ export default function EnhancedMountainAnimation({
       return;
     }
 
-    // 滑らかなアニメーション移動
+    // 長期目標用のゆっくりとした移動（日々のクエストではなく長期達成用）
     const currentDistance = lastProgress * TOTAL_PATH_LENGTH;
     const ctrl = animate(currentDistance, target, {
-      duration: 1.2 / 0.75, // より長めの時間で滑らかに = 1.6秒
-      ease: [0.15, 0.05, 0.15, 1], // さらに滑らかなイージング
+      duration: 3.5, // 大幅に遅くして長期目標感を演出（3.5秒）
+      ease: [0.25, 0.1, 0.25, 1], // よりゆったりとしたイージング
       onUpdate: (L) => {
         const pt = getPointAtLength(L);
         const angle = calculateAngleWithBoundaryConditions(L);
