@@ -15,6 +15,14 @@ import Svg, {
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
+// 星の配列を事前計算（Hook外で実行）
+const STARS = Array.from({ length: 120 }).map((_, i) => ({
+  key: i,
+  x: (i * 97 + 13) % 1200 - 200,
+  y: (i * 53 + 7) % 400 - 150,
+  r: i % 4 === 0 ? 1.8 : i % 3 === 0 ? 1.4 : 1,
+}));
+
 interface EnhancedMountainAnimationProps {
   /** 進捗値 (0-1の範囲) */
   progress: number;
@@ -41,7 +49,7 @@ export default function EnhancedMountainAnimation({
   checkpoints = [0.2, 0.45, 0.7, 1],
 }: EnhancedMountainAnimationProps) {
   const [isMounted, setIsMounted] = useState(false);
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = useReducedMotion() || false;
 
   // アニメーション制御
   const [zoomLevel, setZoomLevel] = useState<number>(1);
@@ -135,7 +143,7 @@ export default function EnhancedMountainAnimation({
       setHikerPosition(calculateHikerPosition(progress));
     }
     setLastProgress(progress);
-  }, [progress, lastProgress, prefersReducedMotion, calculateHikerPosition, zoomLevel]);
+  }, [progress, lastProgress, prefersReducedMotion, calculateHikerPosition]);
 
   // 視差効果の計算（最適化）
   const parallax = useMemo(() => {
@@ -191,22 +199,16 @@ export default function EnhancedMountainAnimation({
         <Rect x="-200" y="-150" width="1200" height="900" fill="url(#sky)" />
         
         {/* 星（静的配置・最適化） */}
-        {useMemo(() => 
-          Array.from({ length: 120 }).map((_, i) => {
-            const x = (i * 97 + 13) % 1200 - 200;
-            const y = (i * 53 + 7) % 400 - 150;
-            return (
-              <Circle
-                key={i}
-                cx={x}
-                cy={y}
-                r={i % 4 === 0 ? 1.8 : i % 3 === 0 ? 1.4 : 1}
-                fill="#cfe7ff"
-                opacity="0.6"
-              />
-            );
-          }), []
-        )}
+        {STARS.map((star) => (
+          <Circle
+            key={star.key}
+            cx={star.x}
+            cy={star.y}
+            r={star.r}
+            fill="#cfe7ff"
+            opacity="0.6"
+          />
+        ))}
         
         {/* 月 */}
         <Circle cx="150" cy="80" r="35" fill="#ffe7aa" />
