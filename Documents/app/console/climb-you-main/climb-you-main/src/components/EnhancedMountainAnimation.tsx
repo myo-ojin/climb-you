@@ -215,13 +215,16 @@ export default function EnhancedMountainAnimation({
     };
   }, []);
 
-  // 進捗変化を検知（長期目標用・より小さな変化でもズーム）
+  // 進捗変化を検知（双方向対応：前進・後退両方でズーム）
   useEffect(() => {
-    if (progress > lastProgress && progress - lastProgress >= 0.02) { // 2%の変化でズーム（長期目標らしく細かく）
-      console.log('🔍 ズーム条件達成:', {
+    const progressDiff = Math.abs(progress - lastProgress);
+    const isForward = progress > lastProgress;
+    
+    if (progressDiff >= 0.02) { // 2%の変化でズーム（前進・後退両方）
+      console.log(`🔍 ズーム条件達成 (${isForward ? '前進' : '後退'}):`, {
         前回: (lastProgress * 100).toFixed(0) + '%',
         現在: (progress * 100).toFixed(0) + '%',
-        差分: ((progress - lastProgress) * 100).toFixed(0) + '%'
+        差分: (progressDiff * 100).toFixed(0) + '%'
       });
       
       // 新しい進捗位置を事前計算してズーム中心を正確に設定
@@ -232,7 +235,8 @@ export default function EnhancedMountainAnimation({
       // ズーム開始時の初期中心位置を設定（後は動的に追従）
       console.log('🎯 ズーム開始位置:', {
         ハイカー位置: { x: futurePoint.x, y: futurePoint.y },
-        角度: futureAngle
+        角度: futureAngle,
+        方向: isForward ? '前進' : '後退'
       });
       
       // 初期ズーム中心は現在のハイカー位置
@@ -243,7 +247,7 @@ export default function EnhancedMountainAnimation({
       
       // ステップ1: ズームイン開始
       setAnimationState('zooming-in');
-      console.log('🎬 ステップ1: ズームイン開始');
+      console.log(`🎬 ステップ1: ズームイン開始 (${isForward ? '前進' : '後退'})`);
       
       animate(zoomLevel, 3, {
         duration: 1.2, // よりゆっくりと滑らかなズームイン
@@ -252,14 +256,14 @@ export default function EnhancedMountainAnimation({
         onComplete: () => {
           // 0.2秒の小休止後に移動許可
           setTimeout(() => {
-            console.log('🎬 ステップ2: 移動許可（0.2秒遅延後）');
+            console.log(`🎬 ステップ2: 移動許可（0.2秒遅延後・${isForward ? '前進' : '後退'}）`);
             setAnimationState('moving');
           }, 200);
           
           // 長期目標用の移動時間に合わせて待機時間を調整
           setTimeout(() => {
             // ステップ3: ズームアウト開始
-            console.log('🎬 ステップ3: ズームアウト開始');
+            console.log(`🎬 ステップ3: ズームアウト開始 (${isForward ? '前進' : '後退'})`);
             setAnimationState('zooming-out');
             
             animate(zoomLevel, 1, {
@@ -267,7 +271,7 @@ export default function EnhancedMountainAnimation({
               ease: [0.25, 0.46, 0.45, 0.94], // ズームインと同じeaseOutCubic風で統一感
               onUpdate: setZoomLevel,
               onComplete: () => {
-                console.log('🎬 完了: 通常状態に戻る');
+                console.log(`🎬 完了: 通常状態に戻る (${isForward ? '前進' : '後退'})`);
                 setAnimationState('idle');
               }
             });
