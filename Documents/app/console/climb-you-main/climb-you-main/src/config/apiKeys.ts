@@ -18,7 +18,7 @@ const API_CONFIG = {
   // フォールバック設定
   ENABLE_AI_FEATURES: process.env.EXPO_PUBLIC_ENABLE_AI_FEATURES === 'true',
   DEBUG_API_CALLS: process.env.EXPO_PUBLIC_DEBUG_API_CALLS === 'true',
-  USE_MOCK_AI: process.env.EXPO_PUBLIC_USE_MOCK_AI === 'true',
+  USE_MOCK_AI: false, // 強制的にAI APIを使用
 };
 
 class APIKeyManager {

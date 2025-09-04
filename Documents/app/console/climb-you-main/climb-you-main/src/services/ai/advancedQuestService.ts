@@ -139,63 +139,192 @@ class AdvancedQuestService {
         prompt.includes('クエスト') ||
         prompt.includes('学習プランナー')) {
       console.log('🎭 Detected QUEST generation prompt');
-      // 日次クエストのモック応答（QuestSchemaに準拠）
-      const mockResponse = JSON.stringify({
-        quests: [
-          {
-            title: "React Nativeコンポーネント基礎学習",
-            pattern: "read_note_q",
-            minutes: 25,
-            difficulty: 0.3,
-            deliverable: "コンポーネント作成サンプルとメモ",
-            steps: [
-              "公式ドキュメントでViewとTextコンポーネントを読む",
-              "要点をメモにまとめる",
-              "理解度確認の3問を自作して解く"
-            ],
-            criteria: [
-              "ViewとTextコンポーネントの基本的な使い方を説明できる",
-              "propsの概念を理解してコードで実装できる"
-            ],
-            tags: ["React Native", "基礎", "コンポーネント"]
-          },
-          {
-            title: "状態管理の実践演習",
-            pattern: "build_micro",
-            minutes: 30,
-            difficulty: 0.5,
-            deliverable: "動作するカウンターアプリ",
-            steps: [
-              "useStateフックを使ったカウンター機能を実装",
-              "ボタンでカウントの増減を制御",
-              "動作確認とコード見直し"
-            ],
-            criteria: [
-              "useStateフックを正しく使用できる",
-              "状態の更新が画面に反映される",
-              "コンポーネントが期待通りに動作する"
-            ],
-            tags: ["React Native", "状態管理", "フック"]
-          },
-          {
-            title: "スタイリング基礎演習",
-            pattern: "flashcards",
-            minutes: 20,
-            difficulty: 0.4,
-            deliverable: "Flexboxレイアウト例とフラッシュカード",
-            steps: [
-              "Flexboxの主要プロパティをフラッシュカードに整理",
-              "簡単なレイアウト例を3パターン作成"
-            ],
-            criteria: [
-              "flexDirection、justifyContent、alignItemsを使い分けられる",
-              "StyleSheetの基本的な書き方を理解している"
-            ],
-            tags: ["React Native", "スタイリング", "Flexbox"]
-          }
-        ],
-        rationale: ["基礎から応用へ段階的に学習", "理論と実践のバランスを重視", "短時間で達成感を得られる構成"]
-      });
+      
+      // プロンプトから目標テキストを抽出
+      let goalText = '学習目標';
+      const goalMatch = prompt.match(/(?:目標|goal|long_term_goal)[：:\s]*["""]?([^"""，。、\n]+)/i);
+      if (goalMatch) {
+        goalText = goalMatch[1].trim();
+      }
+      
+      console.log('🎯 Extracted goal from prompt:', goalText);
+      
+      // 目標に応じたクエストを生成
+      let questData;
+      if (goalText.includes('英語') || goalText.includes('English') || goalText.includes('english')) {
+        questData = {
+          quests: [
+            {
+              title: "基礎英単語学習",
+              pattern: "flashcards",
+              minutes: 20,
+              difficulty: 0.3,
+              deliverable: "英単語フラッシュカードセット",
+              steps: [
+                "日常会話でよく使う英単語50個を選ぶ",
+                "単語の意味と発音を確認する",
+                "フラッシュカードで暗記練習"
+              ],
+              criteria: [
+                "50個の基礎単語を正しく発音できる",
+                "単語の意味を理解して使える"
+              ],
+              tags: ["英語", "単語", "基礎"]
+            },
+            {
+              title: "英会話フレーズ練習",
+              pattern: "build_micro",
+              minutes: 25,
+              difficulty: 0.4,
+              deliverable: "自己紹介と挨拶の録音",
+              steps: [
+                "基本的な挨拶と自己紹介フレーズを学ぶ",
+                "発音練習を繰り返し行う",
+                "実際に声に出して録音する"
+              ],
+              criteria: [
+                "自然な発音で自己紹介ができる",
+                "基本的な挨拶を適切に使える"
+              ],
+              tags: ["英語", "会話", "発音"]
+            },
+            {
+              title: "リスニング基礎トレーニング",
+              pattern: "read_note_q",
+              minutes: 30,
+              difficulty: 0.5,
+              deliverable: "リスニング学習ノート",
+              steps: [
+                "英語学習用動画を選んで視聴する",
+                "聞き取れた内容をメモする",
+                "分からない単語を調べる"
+              ],
+              criteria: [
+                "基本的な英語の音を聞き分けられる",
+                "簡単な会話の内容を理解できる"
+              ],
+              tags: ["英語", "リスニング", "理解"]
+            }
+          ],
+          rationale: ["英語学習の基礎から段階的にアプローチ", "話すスキルを重視した構成", "実践的な練習を取り入れた設計"]
+        };
+      } else if (goalText.includes('プログラミング') || goalText.includes('React') || goalText.includes('開発')) {
+        questData = {
+          quests: [
+            {
+              title: "プログラミング基礎学習",
+              pattern: "read_note_q",
+              minutes: 25,
+              difficulty: 0.3,
+              deliverable: "基礎概念学習ノート",
+              steps: [
+                "プログラミングの基本概念を学ぶ",
+                "要点をメモにまとめる",
+                "理解度確認の問題を作成して解く"
+              ],
+              criteria: [
+                "プログラミングの基本概念を説明できる",
+                "変数や関数の概念を理解している"
+              ],
+              tags: ["プログラミング", "基礎", "学習"]
+            },
+            {
+              title: "実践的なコード作成",
+              pattern: "build_micro",
+              minutes: 30,
+              difficulty: 0.5,
+              deliverable: "動作するサンプルプログラム",
+              steps: [
+                "簡単なプログラムを設計する",
+                "コードを実装して動作確認",
+                "コードの見直しと改善"
+              ],
+              criteria: [
+                "基本的な文法を使ってプログラムを書ける",
+                "エラーを見つけて修正できる"
+              ],
+              tags: ["プログラミング", "実践", "コーディング"]
+            },
+            {
+              title: "開発環境セットアップ",
+              pattern: "config_verify",
+              minutes: 20,
+              difficulty: 0.4,
+              deliverable: "動作確認済み開発環境",
+              steps: [
+                "必要なツールをインストール",
+                "設定ファイルを作成",
+                "動作確認テストを実行"
+              ],
+              criteria: [
+                "開発環境が正しく動作する",
+                "基本的なツールを使いこなせる"
+              ],
+              tags: ["開発環境", "セットアップ", "ツール"]
+            }
+          ],
+          rationale: ["プログラミング学習の基礎から応用", "理論と実践のバランス", "環境構築から実装まで網羅"]
+        };
+      } else {
+        // 一般的な学習目標の場合
+        questData = {
+          quests: [
+            {
+              title: `${goalText}の基礎学習`,
+              pattern: "read_note_q",
+              minutes: 25,
+              difficulty: 0.3,
+              deliverable: "学習ノートとまとめ",
+              steps: [
+                "基本的な概念や用語を調べる",
+                "重要なポイントをメモにまとめる",
+                "理解度を確認する問題を作成"
+              ],
+              criteria: [
+                "基本的な概念を説明できる",
+                "重要な用語を理解している"
+              ],
+              tags: [goalText, "基礎", "学習"]
+            },
+            {
+              title: `${goalText}の実践練習`,
+              pattern: "build_micro",
+              minutes: 30,
+              difficulty: 0.5,
+              deliverable: "実践練習の成果物",
+              steps: [
+                "学んだ内容を実際に試してみる",
+                "練習問題に取り組む",
+                "結果を記録し振り返る"
+              ],
+              criteria: [
+                "学んだ内容を実際に応用できる",
+                "練習を通じて理解を深められる"
+              ],
+              tags: [goalText, "実践", "練習"]
+            },
+            {
+              title: `${goalText}の復習と定着`,
+              pattern: "flashcards",
+              minutes: 20,
+              difficulty: 0.4,
+              deliverable: "復習用フラッシュカード",
+              steps: [
+                "重要なポイントをフラッシュカードにまとめる",
+                "繰り返し復習して記憶に定着させる"
+              ],
+              criteria: [
+                "重要なポイントを記憶している",
+                "学習内容を長期的に覚えている"
+              ],
+              tags: [goalText, "復習", "記憶定着"]
+            }
+          ],
+          rationale: ["基礎から応用へ段階的な学習", "理論と実践のバランス", "継続的な復習による定着"]
+        };
+      }
+      
+      const mockResponse = JSON.stringify(questData);
       console.log('🎭 Quest response generated, length:', mockResponse.length);
       return mockResponse;
       
