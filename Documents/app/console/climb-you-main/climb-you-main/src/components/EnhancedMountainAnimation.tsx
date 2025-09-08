@@ -1,6 +1,5 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { View, StyleSheet, Dimensions, LayoutAnimation, Platform, UIManager } from 'react-native';
-import { animate, useReducedMotion } from 'framer-motion';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
+import { View, StyleSheet, Dimensions, LayoutAnimation, Platform, UIManager, Animated, Easing } from 'react-native';
 import Svg, { 
   Defs, 
   LinearGradient, 
@@ -170,7 +169,6 @@ export default function EnhancedMountainAnimation({
   checkpoints = [0.2, 0.45, 0.7, 1],
 }: EnhancedMountainAnimationProps) {
   const [isMounted, setIsMounted] = useState(false);
-  const prefersReducedMotion = useReducedMotion() || false;
 
   // Android用のLayoutAnimation有効化
   useEffect(() => {
@@ -180,10 +178,14 @@ export default function EnhancedMountainAnimation({
   }, []);
 
   // アニメーション制御
-  const [zoomLevel, setZoomLevel] = useState<number>(1);
+  const zoomLevel = useRef(new Animated.Value(1)).current;
+  const [currentZoomLevel, setCurrentZoomLevel] = useState<number>(1);
   const [zoomCenter, setZoomCenter] = useState<{ x: number; y: number }>({ x: 400, y: 300 });
   const [lastProgress, setLastProgress] = useState<number>(0);
   const [animationState, setAnimationState] = useState<AnimationState>('idle');
+  
+  // ハイカー移動用のアニメーションref（トップレベルで定義）
+  const animationRef = useRef<number>();
 
   // パス関連（React Native用に簡略化）
   const [hikerPosition, setHikerPosition] = useState<HikerPosition>({ x: 80, y: 560, angle: 0 });
@@ -202,6 +204,17 @@ export default function EnhancedMountainAnimation({
 
   useEffect(() => {
     setIsMounted(true);
+    
+    // zoomLevelの値変化を追跡
+    const listener = zoomLevel.addListener(({ value }) => {
+      setCurrentZoomLevel(value);
+    });
+    
+    
+    // クリーンアップ
+    return () => {
+      zoomLevel.removeListener(listener);
+    };
   }, []);
 
   // 高精度ハイカー位置計算（参考元getPointAtLength相当）
@@ -220,26 +233,30 @@ export default function EnhancedMountainAnimation({
     const progressDiff = Math.abs(progress - lastProgress);
     const isForward = progress > lastProgress;
     
-    if (progressDiff >= 0.02) { // 2%の変化でズーム（前進・後退両方）
-      console.log(`🔍 ズーム条件達成 (${isForward ? '前進' : '後退'}):`, {
+    // DEBUG: Log significant progress changes only
+    if (progressDiff >= 0.01) {
+      console.log(`🔍 進捗変化検知 ${(progressDiff * 100).toFixed(1)}%:`, {
+        前回: (lastProgress * 100).toFixed(1) + '%',
+        現在: (progress * 100).toFixed(1) + '%',
+        ズーム: progressDiff >= 0.01 ? '✅' : '❌'
+      });
+    }
+    
+    if (progressDiff >= 0.01) { // 1%の変化でズーム（テスト用に緩く）
+      console.log(`🎬 ズーム開始 (${isForward ? '前進' : '後退'}):`, {
         前回: (lastProgress * 100).toFixed(0) + '%',
         現在: (progress * 100).toFixed(0) + '%',
         差分: (progressDiff * 100).toFixed(0) + '%'
       });
       
-      // 新しい進捗位置を事前計算してズーム中心を正確に設定
-      const target = progress * TOTAL_PATH_LENGTH;
-      const futurePoint = getPointAtLength(target);
-      const futureAngle = calculateAngleWithBoundaryConditions(target);
-      
-      // ズーム開始時の初期中心位置を設定（後は動的に追従）
-      console.log('🎯 ズーム開始位置:', {
-        ハイカー位置: { x: futurePoint.x, y: futurePoint.y },
-        角度: futureAngle,
+      // ズーム開始時は常に現在のハイカー位置を中心にする
+      console.log('🎯 ズーム開始:', {
+        現在ハイカー位置: { x: hikerPosition.x, y: hikerPosition.y },
+        目標進捗: (progress * 100).toFixed(1) + '%',
         方向: isForward ? '前進' : '後退'
       });
       
-      // 初期ズーム中心は現在のハイカー位置
+      // ズーム中心は現在のハイカー位置（前進・後退問わず）
       setZoomCenter({ 
         x: hikerPosition.x, 
         y: hikerPosition.y 
@@ -249,34 +266,34 @@ export default function EnhancedMountainAnimation({
       setAnimationState('zooming-in');
       console.log(`🎬 ステップ1: ズームイン開始 (${isForward ? '前進' : '後退'})`);
       
-      animate(zoomLevel, 3, {
-        duration: 1.2, // よりゆっくりと滑らかなズームイン
-        ease: [0.25, 0.46, 0.45, 0.94], // easeOutCubic風でより自然
-        onUpdate: setZoomLevel,
-        onComplete: () => {
-          // 0.2秒の小休止後に移動許可
-          setTimeout(() => {
-            console.log(`🎬 ステップ2: 移動許可（0.2秒遅延後・${isForward ? '前進' : '後退'}）`);
-            setAnimationState('moving');
-          }, 200);
+      Animated.timing(zoomLevel, {
+        toValue: 3,
+        duration: 1200, // よりゆっくりと滑らかなズームイン
+        easing: Easing.out(Easing.cubic), // easeOutCubic風でより自然
+        useNativeDriver: false,
+      }).start(() => {
+        // 0.2秒の小休止後に移動許可
+        setTimeout(() => {
+          console.log(`🎬 ステップ2: 移動許可（0.2秒遅延後・${isForward ? '前進' : '後退'}）`);
+          setAnimationState('moving');
+        }, 200);
+        
+        // 短縮された待機時間でより反応の良いアニメーション
+        setTimeout(() => {
+          // ステップ3: ズームアウト開始
+          console.log(`🎬 ステップ3: ズームアウト開始 (${isForward ? '前進' : '後退'})`);
+          setAnimationState('zooming-out');
           
-          // 長期目標用の移動時間に合わせて待機時間を調整
-          setTimeout(() => {
-            // ステップ3: ズームアウト開始
-            console.log(`🎬 ステップ3: ズームアウト開始 (${isForward ? '前進' : '後退'})`);
-            setAnimationState('zooming-out');
-            
-            animate(zoomLevel, 1, {
-              duration: 1.8, // ズームインと調和した時間
-              ease: [0.25, 0.46, 0.45, 0.94], // ズームインと同じeaseOutCubic風で統一感
-              onUpdate: setZoomLevel,
-              onComplete: () => {
-                console.log(`🎬 完了: 通常状態に戻る (${isForward ? '前進' : '後退'})`);
-                setAnimationState('idle');
-              }
-            });
-          }, 3500 + 250); // 移動時間3.5秒 + 0.25秒遅延 = 3.75秒後（自然なタイミング）
-        }
+          Animated.timing(zoomLevel, {
+            toValue: 1,
+            duration: 1200, // ズームインと同じ時間で統一
+            easing: Easing.out(Easing.cubic), // ズームインと同じeaseOutCubic風で統一感
+            useNativeDriver: false,
+          }).start(() => {
+            console.log(`🎬 完了: 通常状態に戻る (${isForward ? '前進' : '後退'})`);
+            setAnimationState('idle');
+          });
+        }, 2000 + 100); // 移動時間2秒 + 0.1秒後（より短い待機時間）
       });
     }
     setLastProgress(progress);
@@ -292,7 +309,7 @@ export default function EnhancedMountainAnimation({
     
     const target = progress * TOTAL_PATH_LENGTH;
 
-    if (!isMounted || prefersReducedMotion) {
+    if (!isMounted) {
       // 即座に位置更新（モーション削減時もスムージング適用）
       const pt = getPointAtLength(target);
       const angle = calculateAngleWithBoundaryConditions(target);
@@ -304,44 +321,91 @@ export default function EnhancedMountainAnimation({
       return;
     }
 
-    // 最高品質の滑らかな移動（複数層最適化）
-    const currentDistance = lastProgress * TOTAL_PATH_LENGTH;
-    const ctrl = animate(currentDistance, target, {
-      duration: 3.5,
-      ease: [0.16, 1, 0.3, 1], // easeOutExpo（最も滑らか）
-      onUpdate: (L) => {
-        const rawPt = getPointAtLength(L);
-        const rawAngle = calculateAngleWithBoundaryConditions(L);
-        const rawPosition = { x: rawPt.x, y: rawPt.y, angle: rawAngle };
-        
-        // 3段階スムージング適用
-        const smoothedOnce = smoothPosition(rawPosition, previousPosition, 0.3);
-        const smoothedTwice = smoothPosition(smoothedOnce, hikerPosition, 0.5); 
-        const finalPosition = smoothPosition(smoothedTwice, hikerPosition, 0.8);
-        
-        // 前回位置更新
-        setPreviousPosition(hikerPosition);
-        
-        // requestAnimationFrameで最高の滑らかさ
-        requestAnimationFrame(() => {
-          setHikerPosition(finalPosition);
-          
-          // ズーム中はハイカーと一緒にズーム中心も移動
-          if (zoomLevel > 1) {
-            setZoomCenter({ x: finalPosition.x, y: finalPosition.y });
-          }
-        });
-      },
+    // 現在のハイカーの実際の位置を開始点として使用（前進・後退に正確対応）
+    const currentHikerDistance = (() => {
+      // より高精度に現在のハイカー位置に最も近いパス上の距離を逆算
+      let closestDistance = 0;
+      let minDiff = Infinity;
+      
+      // 0.5刻みでより細かく検索
+      for (let d = 0; d <= TOTAL_PATH_LENGTH; d += 0.5) {
+        const testPoint = getPointAtLength(d);
+        const diff = Math.sqrt(
+          Math.pow(testPoint.x - hikerPosition.x, 2) + 
+          Math.pow(testPoint.y - hikerPosition.y, 2)
+        );
+        if (diff < minDiff) {
+          minDiff = diff;
+          closestDistance = d;
+        }
+      }
+      return closestDistance;
+    })();
+    
+    console.log(`🏃 移動開始:`, {
+      現在ハイカー距離: currentHikerDistance.toFixed(1),
+      目標距離: target.toFixed(1),
+      移動方向: target > currentHikerDistance ? '前進' : '後退',
+      移動距離: Math.abs(target - currentHikerDistance).toFixed(1)
     });
-    return () => ctrl.stop();
-  }, [progress, TOTAL_PATH_LENGTH, prefersReducedMotion, animationState, lastProgress, isMounted]);
+    
+    // 最高品質の滑らかな移動（現在位置から目標位置へ）
+    const animationDuration = 2000; // 短縮された移動時間
+    const startTime = Date.now();
+    
+    const animateMovement = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / animationDuration, 1);
+      const easedProgress = 1 - Math.pow(1 - progress, 3); // easeOut cubic
+      
+      // 現在の実際のハイカー位置から目標位置への補間
+      const L = currentHikerDistance + (target - currentHikerDistance) * easedProgress;
+      
+      const rawPt = getPointAtLength(L);
+      const rawAngle = calculateAngleWithBoundaryConditions(L);
+      const rawPosition = { x: rawPt.x, y: rawPt.y, angle: rawAngle };
+      
+      // 3段階スムージング適用
+      const smoothedOnce = smoothPosition(rawPosition, previousPosition, 0.3);
+      const smoothedTwice = smoothPosition(smoothedOnce, hikerPosition, 0.5); 
+      const finalPosition = smoothPosition(smoothedTwice, hikerPosition, 0.8);
+      
+      // 前回位置更新
+      setPreviousPosition(hikerPosition);
+      
+      // requestAnimationFrameで最高の滑らかさ
+      requestAnimationFrame(() => {
+        setHikerPosition(finalPosition);
+        
+        // ズーム中はハイカーと一緒にズーム中心も移動
+        if (currentZoomLevel > 1) {
+          setZoomCenter({ x: finalPosition.x, y: finalPosition.y });
+        }
+      });
+      
+      if (progress < 1) {
+        animationRef.current = requestAnimationFrame(animateMovement);
+      } else {
+        // アニメーション完了時にlastProgressを更新
+        console.log(`✅ 移動完了: ${target.toFixed(1)} → 進捗更新`);
+      }
+    };
+    
+    animateMovement();
+    
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [progress, TOTAL_PATH_LENGTH, animationState, isMounted]); // lastProgressを依存関係から除去
 
   // 視差効果の計算（最適化）
   const parallax = useMemo(() => {
     return (depth: number) => ({
-      transform: [{ translateX: -(zoomLevel - 1) * depth }],
+      transform: [{ translateX: -(currentZoomLevel - 1) * depth }],
     });
-  }, [zoomLevel]);
+  }, [currentZoomLevel]);
 
   // チェックポイントの位置計算（最適化）
   const checkpointPositions = useMemo(() => {
@@ -362,10 +426,10 @@ export default function EnhancedMountainAnimation({
           width="100%"
           height="100%"
           viewBox={(() => {
-            if (zoomLevel > 1) {
+            if (currentZoomLevel > 1) {
               // ズーム中は常に現在のハイカー位置を中心にする（移動先ではなく）
-              const viewWidth = 800 / zoomLevel;
-              const viewHeight = 600 / zoomLevel;
+              const viewWidth = 800 / currentZoomLevel;
+              const viewHeight = 600 / currentZoomLevel;
               
               // 現在のハイカー位置を中心にする
               const currentHikerX = hikerPosition.x;
@@ -375,7 +439,7 @@ export default function EnhancedMountainAnimation({
               const centerY = currentHikerY - viewHeight / 2;
               
               console.log('📹 ViewBox計算 (ハイカー追従):', {
-                ズームレベル: zoomLevel,
+                ズームレベル: currentZoomLevel,
                 現在のハイカー位置: { x: currentHikerX, y: currentHikerY },
                 ビューサイズ: { w: viewWidth, h: viewHeight },
                 ViewBox: `${centerX.toFixed(1)} ${centerY.toFixed(1)} ${viewWidth.toFixed(1)} ${viewHeight.toFixed(1)}`

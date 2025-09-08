@@ -1,29 +1,85 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Alert, Dimensions, SafeAreaView } from 'react-native';
-import MountainAnimation from '../components/MountainAnimation';
 import EnhancedMountainAnimation from '../components/EnhancedMountainAnimation';
 import { Task } from '../types';
+import { IntegratedUserProfile } from '../types/userProfile';
+import { userProfileService } from '../services/userProfileService';
 
 const { height: screenHeight } = Dimensions.get('window');
 
 export default function MainScreen() {
-  const [tasks, setTasks] = useState<Task[]>([
-    { id: '1', title: '朝のジョギング', description: '朝のジョギング', completed: false, createdAt: new Date() },
-    { id: '2', title: '英語の勉強', description: '英語の勉強', completed: true, createdAt: new Date() },
-    { id: '3', title: 'プロジェクトの企画書作成', description: 'プロジェクトの企画書作成', completed: false, createdAt: new Date() },
-    { id: '4', title: 'プロジェクトの企画書作成', description: 'プロジェクトの企画書作成', completed: false, createdAt: new Date() },
-  ]);
+  // 従来のタスク管理（フォールバック用）
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [progress, setProgress] = useState(0);
-  const [useEnhancedAnimation, setUseEnhancedAnimation] = useState(true); // テスト用切り替え
+  // Enhanced animation only
+  
+  // 統合ユーザープロファイル
+  const [userProfile, setUserProfile] = useState<IntegratedUserProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
+  // 初期化: ユーザープロファイル読み込み
   useEffect(() => {
+    initializeUserProfile();
+  }, []);
+
+  // プログレス計算（リアルタイム更新対応）
+  useEffect(() => {
+    // 常にリアルタイムのタスク状態を使用
     const completedTasks = tasks.filter(task => task.completed).length;
     const totalTasks = tasks.length;
-    // 長期目標用：日々のタスク完了では山頂まで到達しない（最大30%程度）
-    const calculatedProgress = totalTasks > 0 ? (completedTasks / totalTasks) * 30 : 0; // 30%に制限
-    setProgress(Math.min(calculatedProgress, 30)); // 日々のクエストでは30%まで
-  }, [tasks]);
+    const calculatedProgress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+    
+    console.log('📊 進捗計算:', {
+      完了タスク: completedTasks,
+      総タスク数: totalTasks,
+      進捗率: calculatedProgress + '%',
+      'EnhancedMountainAnimation値': (calculatedProgress / 100).toFixed(2)
+    });
+    
+    setProgress(calculatedProgress);
+  }, [tasks]); // userProfileではなくtasksの変化のみを監視
+
+  // ユーザープロファイル初期化
+  const initializeUserProfile = async () => {
+    try {
+      setIsLoading(true);
+      const profile = await userProfileService.loadUserProfile();
+      
+      if (profile) {
+        console.log('👤 User profile loaded:', {
+          userId: profile.userId,
+          goal: profile.onboardingData.goalDeepDiveData.goal_text,
+          questCount: profile.initialQuests.length,
+          todayQuests: profile.progress.todaysQuests.length
+        });
+        
+        setUserProfile(profile);
+        
+        // 今日のクエストをタスクとして設定
+        const todayTasks: Task[] = profile.progress.todaysQuests.map(quest => ({
+          id: quest.title, // 簡易的なID
+          title: quest.title,
+          description: quest.deliverable || '',
+          completed: false,
+          createdAt: new Date(),
+        }));
+        setTasks(todayTasks);
+      } else {
+        console.log('📭 No user profile found, using default tasks');
+        // フォールバック: デフォルトタスク
+        setTasks([
+          { id: '1', title: '朝のジョギング', description: '朝のジョギング', completed: false, createdAt: new Date() },
+          { id: '2', title: '英語の勉強', description: '英語の勉強', completed: true, createdAt: new Date() },
+          { id: '3', title: 'プロジェクト作業', description: 'プロジェクト作業', completed: false, createdAt: new Date() },
+        ]);
+      }
+    } catch (error) {
+      console.error('❌ Failed to load user profile:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const addTask = () => {
     if (newTaskTitle.trim()) {
@@ -106,28 +162,28 @@ export default function MainScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* User Profile Header */}
+      {userProfile && (
+        <View style={styles.profileHeader}>
+          <Text style={styles.profileGoal}>
+            🎯 {userProfile.onboardingData.goalDeepDiveData.goal_text}
+          </Text>
+          <Text style={styles.profileStats}>
+            📚 {userProfile.progress.todaysProgress.completed}/{userProfile.progress.todaysProgress.total} 完了 • 
+            ⏰ {userProfile.aiProfile.time_budget_min_per_day}分/日 •
+            🔥 {userProfile.progress.currentStreak}日連続
+          </Text>
+        </View>
+      )}
+
       {/* Mountain Animation Section - 1/3 of screen */}
       <View style={styles.mountainSection}>
         <View style={styles.mountainCard}>
-          {useEnhancedAnimation ? (
-            <EnhancedMountainAnimation 
-              progress={progress / 100} 
-              checkpoints={[0.25, 0.5, 0.75, 1.0]}
-            />
-          ) : (
-            <MountainAnimation progress={progress} />
-          )}
+          <EnhancedMountainAnimation 
+            progress={progress / 100} 
+            checkpoints={[0.25, 0.5, 0.75, 1.0]}
+          />
         </View>
-        
-        {/* テスト用切り替えボタン */}
-        <TouchableOpacity
-          style={styles.animationToggleButton}
-          onPress={() => setUseEnhancedAnimation(!useEnhancedAnimation)}
-        >
-          <Text style={styles.animationToggleText}>
-            {useEnhancedAnimation ? '🎬 Enhanced' : '⚡ Classic'}
-          </Text>
-        </TouchableOpacity>
       </View>
 
       {/* Task Management Section - 2/3 of screen */}
@@ -319,5 +375,32 @@ const styles = StyleSheet.create({
     color: '#0F2A44',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  // Profile Header Styles
+  profileHeader: {
+    backgroundColor: 'rgba(15, 42, 68, 0.95)',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    marginHorizontal: 16,
+    marginTop: 10,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  profileGoal: {
+    color: '#F3E7C9',
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  profileStats: {
+    color: '#B9C3CF',
+    fontSize: 12,
+    textAlign: 'center',
+    opacity: 0.9,
   },
 });
