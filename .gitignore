@@ -1,0 +1,40 @@
+# Node / React Native / Expo
+node_modules/
+.expo/
+.expo-shared/
+dist/
+build/
+*.log
+
+# Android / iOS (if present)
+android/app/build/
+android/build/
+ios/build/
+ios/DerivedData/
+ios/Pods/
+
+# Editors & OS
+.idea/
+.vscode/
+.DS_Store
+*.iml
+
+# Environment
+.env
+.env.local
+!.env.example
+
+# Python (serena)
+venv/
+.venv/
+serena/.venv/
+__pycache__/
+*.pyc
+.mypy_cache/
+.pytest_cache/
+*.egg-info/
+
+# Coverage & artifacts
+coverage/
+*.coverage
+

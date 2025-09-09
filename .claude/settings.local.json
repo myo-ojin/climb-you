@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(/C:\\Users\\81906\\Documents\\app\\console\\climb-you-main\\climb-you-main\\src\\services\\ai/**)",
+      "Read(/C:\\Users\\81906\\Documents\\app\\console\\climb-you-main\\climb-you-main\\src\\services\\ai/**)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

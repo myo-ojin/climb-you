@@ -1,0 +1,12 @@
+{
+  "extends": 
+  
+  ,
+  "compilerOptions": {
+    "strict": true
+  },
+  "exclude": [
+    "node_modules",
+    "project-docs/**/*"
+  ]
+}

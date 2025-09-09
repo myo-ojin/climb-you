@@ -1,0 +1,22 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // DEVELOPMENT RULES - Allow all authenticated users for testing
+    // TODO: Restrict to user-specific data in production
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Uncomment for production:
+    // // Users collection - user can only access their own data
+    // match /users/{userId} {
+    //   allow read, write: if request.auth != null && request.auth.uid == userId;
+    //   
+    //   // User sub-collections
+    //   match /{document=**} {
+    //     allow read, write: if request.auth != null && request.auth.uid == userId;
+    //   }
+    // }
+  }
+}
