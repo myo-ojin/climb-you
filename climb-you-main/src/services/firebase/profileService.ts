@@ -4,7 +4,7 @@
  */
 
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp, runTransaction } from 'firebase/firestore';
-import { firebaseConfig } from './config';
+import { getFirebaseFirestore, getFirebaseAuth } from '../../config/firebaseConfig';
 import {
   ProfileV1,
   ProfileV1Schema,
@@ -32,8 +32,8 @@ export class ProfileService {
     testWriteResult?: string;
   }> {
     try {
-      const firestore = firebaseConfig.getFirestore();
-      const auth = firebaseConfig.getAuth();
+      const firestore = getFirebaseFirestore();
+      const auth = getFirebaseAuth();
       
       if (!firestore) {
         return {
@@ -120,7 +120,7 @@ export class ProfileService {
       const validatedProfile = ProfileV1Schema.parse(profileV1);
       const validatedGoalDeepDive = GoalDeepDiveAnswersSchema.parse(goalDeepDive);
       
-      const firestore = firebaseConfig.getFirestore();
+      const firestore = getFirebaseFirestore();
       if (!firestore) {
         return { success: false, error: new Error('Firestore not initialized') };
       }
@@ -161,7 +161,7 @@ export class ProfileService {
    */
   async getUserProfile(userId: string): Promise<Result<UserProfileDocument | null>> {
     try {
-      const firestore = firebaseConfig.getFirestore();
+      const firestore = getFirebaseFirestore();
       if (!firestore) {
         return { success: false, error: new Error('Firestore not initialized') };
       }
@@ -196,7 +196,7 @@ export class ProfileService {
     try {
       const { userId, updates } = args;
       
-      const firestore = firebaseConfig.getFirestore();
+      const firestore = getFirebaseFirestore();
       if (!firestore) {
         return { success: false, error: new Error('Firestore not initialized') };
       }
@@ -260,7 +260,7 @@ export class ProfileService {
    */
   async markOnboardingCompleted(userId: string): Promise<Result<void>> {
     try {
-      const firestore = firebaseConfig.getFirestore();
+      const firestore = getFirebaseFirestore();
       if (!firestore) {
         return { success: false, error: new Error('Firestore not initialized') };
       }
@@ -285,7 +285,7 @@ export class ProfileService {
    */
   async resetOnboarding(userId: string): Promise<Result<void>> {
     try {
-      const firestore = firebaseConfig.getFirestore();
+      const firestore = getFirebaseFirestore();
       if (!firestore) {
         return { success: false, error: new Error('Firestore not initialized') };
       }
