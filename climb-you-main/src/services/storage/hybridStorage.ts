@@ -188,8 +188,8 @@ class HybridStorageService {
       return false;
     }
 
-    const user = firebaseConfig.getCurrentUser();
-    if (!user) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
       return false;
     }
 
@@ -203,14 +203,14 @@ class HybridStorageService {
     try {
       const userData = await this.getUserData();
       if (userData) {
-        await firestoreService.updateUser(user.uid, userData);
+        await firestoreService.updateUser(userId, userData);
       }
 
       const goals = await this.getGoals();
       for (const goal of goals) {
         if (goal.id.startsWith('temp_')) {
           const { id, ...goalData } = goal;
-          const newId = await firestoreService.createGoal(user.uid, goalData);
+          const newId = await firestoreService.createGoal(userId, goalData);
           
           const updatedGoals = goals.map(g => 
             g.id === id ? { ...g, id: newId } : g
@@ -223,7 +223,7 @@ class HybridStorageService {
       for (const quest of quests) {
         if (quest.id.startsWith('temp_')) {
           const { id, ...questData } = quest;
-          const newId = await firestoreService.createQuest(user.uid, questData);
+          const newId = await firestoreService.createQuest(userId, questData);
           
           const updatedQuests = quests.map(q => 
             q.id === id ? { ...q, id: newId } : q

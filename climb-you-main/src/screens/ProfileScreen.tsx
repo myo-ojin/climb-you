@@ -104,7 +104,7 @@ export default function ProfileScreen() {
         const userId = await signInAnonymousUser();
         setUserId(userId);
         setConnectionStatus('匿名認証済み');
-        results.push(`✅ 匿名認証成功: ${user.uid.substring(0, 8)}...`);
+        results.push(`✅ 匿名認証成功: ${userId.substring(0, 8)}...`);
         
         // Hybrid Storageテスト - Goal作成
         const goalId = await hybridStorageService.createGoal({
@@ -761,7 +761,7 @@ export default function ProfileScreen() {
       if (!userId) {
         const userId = await signInAnonymousUser();
         setUserId(userId);
-        results.push(`🔐 匿名認証完了: ${user.uid.substring(0, 8)}...`);
+        results.push(`🔐 匿名認証完了: ${userId.substring(0, 8)}...`);
       }
       
       // Create test profile data
@@ -904,7 +904,7 @@ export default function ProfileScreen() {
         results.push('🔐 匿名認証を実行中...');
         const userId = await signInAnonymousUser();
         setUserId(userId);
-        results.push(`✅ 匿名認証成功: ${user.uid}`);
+        results.push(`✅ 匿名認証成功: ${userId}`);
       }
       
       // Run comprehensive diagnosis
@@ -975,7 +975,7 @@ export default function ProfileScreen() {
       if (!userId) {
         const userId = await signInAnonymousUser();
         setUserId(userId);
-        results.push(`✅ 匿名認証: ${user.uid.substring(0, 8)}...`);
+        results.push(`✅ 匿名認証: ${userId.substring(0, 8)}...`);
       } else {
         results.push(`✅ 既存ユーザー: ${userId.substring(0, 8)}...`);
       }
@@ -1144,7 +1144,7 @@ export default function ProfileScreen() {
       if (!userId) {
         const userId = await signInAnonymousUser();
         setUserId(userId);
-        results.push(`🔐 匿名認証: ${user.uid.substring(0, 8)}...`);
+        results.push(`🔐 匿名認証: ${userId.substring(0, 8)}...`);
       }
 
       // Test complete profile save

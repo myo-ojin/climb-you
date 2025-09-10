@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, Alert, StyleSheet, ScrollView } from 'react-native';
-import { firebaseConfig } from '../services/firebase/config';
+import { getCurrentUserId, signInAnonymousUser } from '../config/firebaseConfig';
 import { hybridStorageService } from '../services/storage/hybridStorage';
 import { openaiService } from '../services/ai/openaiService';
 
@@ -15,9 +15,9 @@ const FirebaseTestExtended: React.FC = () => {
   }, []);
 
   const checkServices = async () => {
-    const currentUser = firebaseConfig.getCurrentUser();
-    if (currentUser) {
-      setUserId(currentUser.uid);
+    const currentUserId = await getCurrentUserId();
+    if (currentUserId) {
+      setUserId(currentUserId);
       setConnectionStatus('Connected anonymously');
       await checkSyncStatus();
     } else {
@@ -42,10 +42,10 @@ const FirebaseTestExtended: React.FC = () => {
   const testAnonymousAuth = async () => {
     setIsLoading(true);
     try {
-      const user = await firebaseConfig.signInAnonymously();
-      setUserId(user.uid);
+      const userId = await signInAnonymousUser();
+      setUserId(userId);
       setConnectionStatus('Connected anonymously');
-      Alert.alert('Success', `Signed in as: ${user.uid}`);
+      Alert.alert('Success', `Signed in as: ${userId}`);
       await checkSyncStatus();
     } catch (error) {
       console.error('Auth test failed:', error);
