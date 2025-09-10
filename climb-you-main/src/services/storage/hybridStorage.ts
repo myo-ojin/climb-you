@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { firestoreService, UserDocument, GoalDocument, QuestDocument } from '../firebase/firestore';
-import { firebaseConfig } from '../firebase/config';
+import { initializeFirebaseServices, getCurrentUserId } from '../../config/firebaseConfig';
 
 export interface StorageSyncStatus {
   lastSyncAt?: Date;
@@ -19,8 +19,12 @@ class HybridStorageService {
   private syncInProgress = false;
 
   async initialize(): Promise<void> {
-    await firebaseConfig.initialize();
-    await this.attemptSync();
+    try {
+      await initializeFirebaseServices();
+      await this.attemptSync();
+    } catch (error) {
+      console.log('🎭 Firebase initialization failed in HybridStorage, continuing in demo mode:', error);
+    }
   }
 
   async saveUserData(userData: UserDocument): Promise<void> {
@@ -84,8 +88,8 @@ class HybridStorageService {
   }
 
   async createGoal(goalData: Omit<GoalDocument, 'id' | 'userId' | 'createdAt'>): Promise<string> {
-    const user = firebaseConfig.getCurrentUser();
-    if (!user) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
       throw new Error('User not authenticated');
     }
 
