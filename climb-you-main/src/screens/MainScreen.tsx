@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Alert, Dimensions, SafeAreaView } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import EnhancedMountainAnimation from '../components/EnhancedMountainAnimation';
 import { Task } from '../types';
 import { IntegratedUserProfile } from '../types/userProfile';
@@ -44,6 +45,12 @@ export default function MainScreen() {
     try {
       setIsLoading(true);
       console.log('🔍 MainScreen: Starting profile initialization...');
+      
+      // デバッグ: 現在のキャッシュ状況を確認
+      const cacheKeys = await AsyncStorage.getAllKeys();
+      console.log('🔍 MainScreen: Current cache keys:', cacheKeys.filter(key => 
+        key.includes('firebase') || key.includes('task') || key.includes('profile')
+      ));
       const profile = await firebaseUserProfileService.loadUserProfile();
       
       console.log('🔍 MainScreen: Profile load result:', {
@@ -62,18 +69,19 @@ export default function MainScreen() {
         
         setUserProfile(profile);
         
-        // 今日のクエストをタスクとして設定（Contextが空の場合のみ）
-        if (tasks.length === 0) {
+        // 今日のクエストをタスクとして設定（常にプロフィールのクエストを優先）
+        if (profile.progress?.todaysQuests?.length > 0) {
           console.log('🔍 MainScreen: Converting quests to tasks...', {
             todaysQuests: profile.progress.todaysQuests,
-            tasksLength: tasks.length
+            questCount: profile.progress.todaysQuests.length,
+            existingTasksLength: tasks.length
           });
           
-          const todayTasks: Task[] = profile.progress.todaysQuests.map(quest => ({
-            id: quest.title, // 簡易的なID
+          const todayTasks: Task[] = profile.progress.todaysQuests.map((quest, index) => ({
+            id: `quest_${Date.now()}_${index}`, // より信頼性の高いID生成
             title: quest.title,
             description: quest.deliverable || '',
-            completed: false,
+            completed: quest.completed || false,
             createdAt: new Date(),
           }));
           
@@ -81,7 +89,15 @@ export default function MainScreen() {
           updateTasks(todayTasks);
           console.log('🔍 MainScreen: Tasks updated successfully');
         } else {
-          console.log('🔍 MainScreen: Tasks already exist, skipping quest conversion');
+          console.log('⚠️ No today quests found in profile, using fallback tasks');
+          // フォールバック: デフォルトタスク（クエストが存在しない場合のみ）
+          if (tasks.length === 0) {
+            updateTasks([
+              { id: '1', title: '朝のジョギング', description: '朝のジョギング', completed: false, createdAt: new Date() },
+              { id: '2', title: '英語の勉強', description: '英語の勉強', completed: true, createdAt: new Date() },
+              { id: '3', title: 'プロジェクト作業', description: 'プロジェクト作業', completed: false, createdAt: new Date() },
+            ]);
+          }
         }
       } else {
         console.log('📭 No user profile found, using default tasks');
@@ -161,15 +177,15 @@ export default function MainScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {/* User Profile Header */}
-      {userProfile && (
+      {userProfile && userProfile.onboardingData?.goalDeepDiveData && (
         <View style={styles.profileHeader}>
           <Text style={styles.profileGoal}>
-            🎯 {userProfile.onboardingData.goalDeepDiveData.goal_text}
+            🎯 {userProfile.onboardingData.goalDeepDiveData.goal_text || 'Goal not set'}
           </Text>
           <Text style={styles.profileStats}>
-            📚 {userProfile.progress.todaysProgress.completed}/{userProfile.progress.todaysProgress.total} 完了 • 
-            ⏰ {userProfile.aiProfile.time_budget_min_per_day}分/日 •
-            🔥 {userProfile.progress.currentStreak}日連続
+            📚 {userProfile.progress?.todaysProgress?.completed || 0}/{userProfile.progress?.todaysProgress?.total || 0} 完了 • 
+            ⏰ {userProfile.aiProfile?.time_budget_min_per_day || 0}分/日 •
+            🔥 {userProfile.progress?.currentStreak || 0}日連続
           </Text>
         </View>
       )}

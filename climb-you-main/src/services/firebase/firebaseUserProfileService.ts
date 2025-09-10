@@ -16,6 +16,8 @@ import {
   FirebaseGoal,
   FirebaseQuest,
   FirebaseProgress,
+  FirebaseProfileResponse,
+  FirebaseQuestPreference,
   OnboardingToFirebaseData
 } from '../../types/firebase';
 import { ProfileV1, Quest, SkillAtom, Pattern } from '../ai/promptEngine';
@@ -39,10 +41,19 @@ class FirebaseUserProfileService {
     onboardingData: CompleteOnboardingData
   ): Promise<IntegratedUserProfile> {
     try {
-      console.log('🔥 Starting Firebase onboarding data integration...');
+      console.log('🔥 Starting Firebase onboarding data integration...', {
+        hasGoalDeepDiveData: !!onboardingData.goalDeepDiveData,
+        hasProfileData: !!onboardingData.profileData,
+        hasQuestPreferencesData: !!onboardingData.questPreferencesData,
+        hasLearningStrategy: !!onboardingData.learningStrategy,
+        goalText: onboardingData.goalDeepDiveData?.goal_text || 'Not provided',
+        profileAnswersCount: Object.keys(onboardingData.profileData?.profileAnswers || {}).length,
+        questPreferencesCount: Object.keys(onboardingData.questPreferencesData?.preferences || {}).length
+      });
       
       // 1. Anonymous userを取得/作成 (デモモード対応済み)
       const userId = await signInAnonymousUser();
+      console.log('🔍 Firebase: User ID obtained:', userId);
       
       // 2. AI Profileを生成
       const aiProfile = this.convertToAIProfile(onboardingData);
@@ -65,14 +76,31 @@ class FirebaseUserProfileService {
         initialQuests = this.getBasicQuests(onboardingData.goalDeepDiveData);
       }
       
-      // 5. Firebaseデータ構造に変換
-      const firebaseData = await this.convertToFirebaseData(
-        userId,
-        onboardingData,
-        aiProfile,
-        skillAtoms,
-        initialQuests
-      );
+      // 5. Firebaseデータ構造に変換 (エラーハンドリング付き)
+      let firebaseData;
+      try {
+        console.log('🔍 Converting to Firebase data structure...', {
+          userId,
+          hasOnboardingData: !!onboardingData,
+          hasAiProfile: !!aiProfile,
+          skillAtomsCount: skillAtoms.length,
+          initialQuestsCount: initialQuests.length,
+          onboardingDataKeys: Object.keys(onboardingData || {})
+        });
+        
+        firebaseData = await this.convertToFirebaseData(
+          userId,
+          onboardingData,
+          aiProfile,
+          skillAtoms,
+          initialQuests
+        );
+        
+        console.log('✅ Firebase data conversion successful');
+      } catch (conversionError) {
+        console.error('❌ Firebase data conversion error:', conversionError);
+        throw new Error(`Firebase data conversion failed: ${conversionError.message}`);
+      }
       
       // 6. Firestoreに保存 (デモモードではスキップ)
       const envInfo = EnvironmentConfig.getEnvironmentInfo();
@@ -103,10 +131,19 @@ class FirebaseUserProfileService {
       }
       
       // 7. 統合プロファイル形式で返却
+      console.log('🔧 Building integrated profile...');
       const integratedProfile = await this.buildIntegratedProfile(userId, firebaseData);
+      console.log('✅ Integrated profile built:', {
+        userId: integratedProfile.userId,
+        questCount: integratedProfile.initialQuests?.length || 0,
+        todayQuestCount: integratedProfile.progress?.todaysQuests?.length || 0,
+        todayQuestTitles: integratedProfile.progress?.todaysQuests?.map(q => q.title) || []
+      });
       
       // 8. ローカルキャッシュに保存 (常に実行)
+      console.log('💾 Saving integrated profile to cache...');
       await this.cacheProfile(integratedProfile);
+      console.log('✅ Profile cached successfully');
       
       console.log('✅ Firebase onboarding data integration completed:', {
         userId,
@@ -307,145 +344,239 @@ class FirebaseUserProfileService {
     skillAtoms: SkillAtom[],
     initialQuests: Quest[]
   ): Promise<OnboardingToFirebaseData> {
-    const now = Timestamp.now();
-    
-    // User Profile
-    const userProfile: Partial<FirebaseUserProfile> = {
-      userId,
-      onboardingCompleted: true,
-      onboardingCompletedAt: now,
-      onboardingVersion: '1.0',
-      aiProfile,
-      skillAtoms,
-      appSettings: {
-        notifications: true,
-        theme: 'auto',
-        language: 'ja',
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      },
-      dataRetentionDays: 365,
-      analyticsOptIn: true,
-      stats: {
-        totalQuests: initialQuests.length,
-        completedQuests: 0,
-        currentStreak: 0,
-        longestStreak: 0,
-        totalLearningMinutes: 0,
-        averageSessionLength: aiProfile.preferred_session_length_min,
-        completionRate: 0,
-        lastActiveDate: now,
-      },
-    };
+    try {
+      console.log('🔍 [convertToFirebaseData] Starting conversion...', {
+        userId: userId || 'MISSING',
+        hasOnboardingData: !!onboardingData,
+        hasAiProfile: !!aiProfile,
+        skillAtomsLength: skillAtoms?.length || 0,
+        initialQuestsLength: initialQuests?.length || 0,
+        onboardingDataType: typeof onboardingData,
+        onboardingDataKeys: onboardingData ? Object.keys(onboardingData) : [],
+      });
+      
+      // Enhanced null checks
+      if (!userId) {
+        throw new Error('userId is required for Firebase conversion');
+      }
+      
+      if (!onboardingData || typeof onboardingData !== 'object') {
+        throw new Error('onboardingData is required and must be an object');
+      }
+      
+      if (!aiProfile || typeof aiProfile !== 'object') {
+        throw new Error('aiProfile is required and must be an object');
+      }
 
-    // Goal
-    const goal: Partial<FirebaseGoal> = {
-      goalText: onboardingData.goalDeepDiveData.goal_text,
-      goalCategory: onboardingData.goalDeepDiveData.goal_category,
-      goalDeadline: onboardingData.goalDeepDiveData.goal_deadline,
-      goalImportance: onboardingData.goalDeepDiveData.goal_importance,
-      timeBudgetPerDay: onboardingData.goalDeepDiveData.time_budget_min_per_day,
-      preferredSessionLength: onboardingData.goalDeepDiveData.preferred_session_length_min,
-      envConstraints: onboardingData.goalDeepDiveData.env_constraints || [],
-      modalityPreference: onboardingData.goalDeepDiveData.modality_preference || [],
-      avoidModality: onboardingData.goalDeepDiveData.avoid_modality || [],
-      status: 'active',
-      progress: {
-        currentLevel: 1,
-        totalMilestones: 10,
-        completedMilestones: 0,
-        progressPercentage: 0,
-      },
-    };
-
-    // Profile Responses
-    const profileResponses: FirebaseProfileResponse[] = Object.entries(onboardingData.profileData.profileAnswers).map(
-      ([key, value], index) => ({
-        id: `response_${Date.now()}_${index}`,
+      const now = Timestamp.now();
+      
+      // Debug: Check goalDeepDiveData structure
+      console.log('🔍 [convertToFirebaseData] Goal data analysis:', {
+        hasGoalDeepDiveData: !!onboardingData.goalDeepDiveData,
+        goalDeepDiveDataType: typeof onboardingData.goalDeepDiveData,
+        goalDeepDiveDataKeys: onboardingData.goalDeepDiveData ? Object.keys(onboardingData.goalDeepDiveData) : [],
+        goalText: onboardingData.goalDeepDiveData?.goal_text || 'MISSING',
+        goalCategory: onboardingData.goalDeepDiveData?.goal_category || 'MISSING',
+      });
+      
+      // Safely extract goal data with fallbacks
+      const goalData = onboardingData.goalDeepDiveData || {};
+      const defaultGoalData = {
+        goal_text: goalData.goal_text || 'Default goal',
+        goal_category: goalData.goal_category || 'learning',
+        goal_deadline: goalData.goal_deadline || '2024-12-31',
+        goal_importance: goalData.goal_importance || 3,
+        time_budget_min_per_day: goalData.time_budget_min_per_day || 30,
+        preferred_session_length_min: goalData.preferred_session_length_min || aiProfile.preferred_session_length_min || 15,
+        env_constraints: goalData.env_constraints || [],
+        modality_preference: goalData.modality_preference || [],
+        avoid_modality: goalData.avoid_modality || [],
+      };
+      
+      console.log('🔍 [convertToFirebaseData] Using goal data:', defaultGoalData);
+      
+      // User Profile
+      const userProfile: Partial<FirebaseUserProfile> = {
         userId,
-        questionId: `question_${key}`,
-        goalId: '', // Will be filled after goal creation
-        createdAt: now,
-        response: value,
-        confidence: 0.8,
-        timeSpentSeconds: 30,
-        memo: onboardingData.profileData.memos[key] || '',
-      })
-    );
-
-    // Quest Preferences
-    const questPreferences: FirebaseQuestPreference[] = Object.entries(onboardingData.questPreferencesData || {}).map(
-      ([questIndex, rating], index) => ({
-        id: `pref_${Date.now()}_${index}`,
-        userId,
-        questId: `quest_${questIndex}`,
-        createdAt: now,
-        rating: rating as 'love' | 'like' | 'dislike',
-        context: {
-          questStatus: 'pending',
-          sessionContext: 'onboarding',
-          timeOfDay: new Date().getHours().toString(),
+        onboardingCompleted: true,
+        onboardingCompletedAt: now,
+        onboardingVersion: '1.0',
+        aiProfile,
+        skillAtoms: skillAtoms || [],
+        appSettings: {
+          notifications: true,
+          theme: 'auto',
+          language: 'ja',
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         },
-      })
-    );
+        dataRetentionDays: 365,
+        analyticsOptIn: true,
+        stats: {
+          totalQuests: initialQuests?.length || 0,
+          completedQuests: 0,
+          currentStreak: 0,
+          longestStreak: 0,
+          totalLearningMinutes: 0,
+          averageSessionLength: aiProfile.preferred_session_length_min || 15,
+          completionRate: 0,
+          lastActiveDate: now,
+        },
+      };
 
-    // Initial Quests
-    const firebaseQuests: FirebaseQuest[] = initialQuests.map((quest, index) => ({
-      id: `quest_${Date.now()}_${index}`,
-      userId,
-      goalId: '', // Will be filled after goal creation
-      createdAt: now,
-      updatedAt: now,
-      title: quest.title,
-      description: quest.description,
-      deliverable: quest.deliverable,
-      minutes: quest.minutes,
-      difficulty: quest.difficulty,
-      pattern: quest.pattern,
-      skillAtomIds: quest.skillAtoms?.map(atom => atom.id) || [],
-      dependencies: [],
-      tags: [quest.pattern],
-      status: 'pending',
-      generationContext: {
-        model: process.env.EXPO_PUBLIC_OPENAI_MODEL || 'gpt-3.5-turbo',
-        version: '1.0',
-        parentQuests: [],
-        personalizationFactors: ['onboarding_profile'],
-      },
-    }));
+      // Goal with safe access
+      const goal: Partial<FirebaseGoal> = {
+        goalText: defaultGoalData.goal_text,
+        goalCategory: defaultGoalData.goal_category as any,
+        goalDeadline: defaultGoalData.goal_deadline,
+        goalImportance: defaultGoalData.goal_importance as any,
+        timeBudgetPerDay: defaultGoalData.time_budget_min_per_day,
+        preferredSessionLength: defaultGoalData.preferred_session_length_min,
+        envConstraints: defaultGoalData.env_constraints,
+        modalityPreference: defaultGoalData.modality_preference as any,
+        avoidModality: defaultGoalData.avoid_modality as any,
+        status: 'active',
+        progress: {
+          currentLevel: 1,
+          totalMilestones: 10,
+          completedMilestones: 0,
+          progressPercentage: 0,
+        },
+      };
+      
+      console.log('🔍 [convertToFirebaseData] Created goal object:', goal);
 
-    // Initial Progress
-    const initialProgress: FirebaseProgress = {
-      id: `progress_${new Date().toISOString().split('T')[0]}`,
-      userId,
-      goalId: '', // Will be filled after goal creation
-      date: new Date().toISOString().split('T')[0],
-      createdAt: now,
-      updatedAt: now,
-      dailyStats: {
-        questsCompleted: 0,
-        totalMinutes: 0,
-        sessionCount: 0,
-        averageQuality: 0,
-        skillAtomsProgressed: [],
-      },
-      streakDays: 0,
-      weeklyPattern: [0, 0, 0, 0, 0, 0, 0],
-      mountainProgress: {
-        currentAltitude: 0,
-        todayClimb: 0,
-        totalDistance: 0,
-        flagsCollected: [],
-      },
-    };
+    // Profile Responses - Add null checks
+    const profileResponses: FirebaseProfileResponse[] = [];
+    if (onboardingData.profileData?.profileAnswers && typeof onboardingData.profileData.profileAnswers === 'object') {
+      Object.entries(onboardingData.profileData.profileAnswers).forEach(([key, value], index) => {
+        if (key && value !== undefined && value !== null) {
+          profileResponses.push({
+            id: `response_${Date.now()}_${index}`,
+            userId,
+            questionId: `question_${key}`,
+            goalId: '', // Will be filled after goal creation
+            createdAt: now,
+            response: value,
+            confidence: 0.8,
+            timeSpentSeconds: 30,
+            memo: onboardingData.profileData.memos?.[key] || '',
+          });
+        }
+      });
+    }
 
-    return {
-      userProfile,
-      goal,
-      profileResponses,
-      questPreferences,
-      initialQuests: firebaseQuests,
-      initialProgress,
-    };
+    // Quest Preferences - Add null checks
+    const questPreferences: FirebaseQuestPreference[] = [];
+    if (onboardingData.questPreferencesData?.preferences && typeof onboardingData.questPreferencesData.preferences === 'object') {
+      Object.entries(onboardingData.questPreferencesData.preferences).forEach(([questIndex, rating], index) => {
+        if (questIndex && rating && ['love', 'like', 'dislike'].includes(rating as string)) {
+          questPreferences.push({
+            id: `pref_${Date.now()}_${index}`,
+            userId,
+            questId: `quest_${questIndex}`,
+            createdAt: now,
+            rating: rating as 'love' | 'like' | 'dislike',
+            context: {
+              questStatus: 'pending',
+              sessionContext: 'onboarding',
+              timeOfDay: new Date().getHours().toString(),
+            },
+          });
+        }
+      });
+    }
+
+      // Initial Quests with safe mapping
+      const firebaseQuests: FirebaseQuest[] = (initialQuests || []).map((quest, index) => {
+        console.log(`🔍 [convertToFirebaseData] Processing quest ${index}:`, {
+          title: quest?.title || 'MISSING',
+          deliverable: quest?.deliverable || 'MISSING',
+          minutes: quest?.minutes || 0,
+          pattern: quest?.pattern || 'unknown',
+        });
+        
+        return {
+          id: `quest_${Date.now()}_${index}`,
+          userId,
+          goalId: '', // Will be filled after goal creation
+          createdAt: now,
+          updatedAt: now,
+          title: quest?.title || 'Generated Quest',
+          description: quest?.description || '',
+          deliverable: quest?.deliverable || 'Complete the task',
+          minutes: quest?.minutes || 15,
+          difficulty: quest?.difficulty || 0.5,
+          pattern: quest?.pattern || 'read_note_q',
+          skillAtomIds: quest?.skillAtoms?.map(atom => atom?.id).filter(Boolean) || [],
+          dependencies: [],
+          tags: quest?.tags || [quest?.pattern] || ['default'],
+          status: 'pending',
+          generationContext: {
+            model: process.env.EXPO_PUBLIC_OPENAI_MODEL || 'gpt-3.5-turbo',
+            version: '1.0',
+            parentQuests: [],
+            personalizationFactors: ['onboarding_profile'],
+          },
+        };
+      });
+
+      // Initial Progress
+      const initialProgress: FirebaseProgress = {
+        id: `progress_${new Date().toISOString().split('T')[0]}`,
+        userId,
+        goalId: '', // Will be filled after goal creation
+        date: new Date().toISOString().split('T')[0],
+        createdAt: now,
+        updatedAt: now,
+        dailyStats: {
+          questsCompleted: 0,
+          totalMinutes: 0,
+          sessionCount: 0,
+          averageQuality: 0,
+          skillAtomsProgressed: [],
+        },
+        streakDays: 0,
+        weeklyPattern: [0, 0, 0, 0, 0, 0, 0],
+        mountainProgress: {
+          currentAltitude: 0,
+          todayClimb: 0,
+          totalDistance: 0,
+          flagsCollected: [],
+        },
+      };
+
+      const result = {
+        userProfile,
+        goal,
+        profileResponses,
+        questPreferences,
+        initialQuests: firebaseQuests,
+        initialProgress,
+      };
+      
+      console.log('✅ [convertToFirebaseData] Conversion completed successfully:', {
+        userProfileKeys: Object.keys(userProfile),
+        goalKeys: Object.keys(goal),
+        profileResponsesCount: profileResponses.length,
+        questPreferencesCount: questPreferences.length,
+        firebaseQuestsCount: firebaseQuests.length,
+      });
+      
+      return result;
+      
+    } catch (error) {
+      console.error('❌ [convertToFirebaseData] Conversion failed:', {
+        error: error.message,
+        stack: error.stack,
+        userId,
+        hasOnboardingData: !!onboardingData,
+        hasAiProfile: !!aiProfile,
+        errorType: error.constructor.name,
+      });
+      
+      // Re-throw with more context
+      throw new Error(`Firebase data conversion failed: ${error.message}. Check that all required onboarding data is properly structured.`);
+    }
   }
 
   private async saveToFirestore(userId: string, data: OnboardingToFirebaseData): Promise<void> {
@@ -490,7 +621,50 @@ class FirebaseUserProfileService {
       userId,
       createdAt: now,
       updatedAt: now,
-      onboardingData: {} as CompleteOnboardingData, // TODO: Reconstruct if needed
+      onboardingData: {
+        goalDeepDiveData: {
+          goal_text: firebaseData.goal.goalText || '',
+          goal_category: firebaseData.goal.goalCategory || '',
+          goal_deadline: firebaseData.goal.goalDeadline || '',
+          goal_importance: firebaseData.goal.goalImportance || 3,
+          time_budget_min_per_day: firebaseData.goal.timeBudgetPerDay || 30,
+          preferred_session_length_min: firebaseData.goal.preferredSessionLength || 25,
+          env_constraints: firebaseData.goal.envConstraints || [],
+          modality_preference: firebaseData.goal.modalityPreference || [],
+          avoid_modality: firebaseData.goal.avoidModality || []
+        },
+        profileData: {
+          profileAnswers: {},
+          memos: {}
+        },
+        questPreferencesData: {
+          preferences: {},
+          feedback: {}
+        },
+        learningStrategy: {
+          recommendedPace: 'moderate',
+          dailyTimeAllocation: firebaseData.goal.timeBudgetPerDay || 30,
+          learningStyle: '段階的・実践重視型',
+          keyStrengths: [],
+          potentialChallenges: [],
+          initialQuests: firebaseData.initialQuests.map(fq => ({
+            title: fq.title,
+            description: fq.description,
+            deliverable: fq.deliverable,
+            minutes: fq.minutes,
+            difficulty: fq.difficulty,
+            pattern: fq.pattern,
+            skillAtoms: [],
+            tags: fq.tags,
+          })),
+          milestones: [],
+          successPrediction: {
+            probability: 0.75,
+            confidenceLevel: 'medium' as const,
+            keyFactors: []
+          }
+        }
+      } as CompleteOnboardingData,
       aiProfile: firebaseData.userProfile.aiProfile!,
       skillAtoms: firebaseData.userProfile.skillAtoms!,
       initialQuests: firebaseData.initialQuests.map(fq => ({
@@ -835,52 +1009,6 @@ class FirebaseUserProfileService {
     } catch (error) {
       console.error('❌ Error checking onboarding status:', error);
       return false;
-    }
-  }
-
-  /**
-   * ユーザープロファイルをロード (デモモード対応)
-   */
-  async loadUserProfile(): Promise<IntegratedUserProfile | null> {
-    try {
-      console.log('📂 Loading user profile from Firebase...');
-      
-      const envInfo = EnvironmentConfig.getEnvironmentInfo();
-      if (envInfo.mode === 'demo') {
-        console.log('🎭 Demo mode: Skipping Firebase profile loading');
-        return null;
-      }
-
-      // Production mode: load from Firebase
-      const userId = await getCurrentUserId();
-      const firebaseProfile = await firestoreService.getUserProfile(userId);
-      if (!firebaseProfile || !firebaseProfile.onboardingCompleted) {
-        console.log('📄 No completed profile found in Firebase');
-        return null;
-      }
-
-      const goals = await firestoreService.getUserGoals(userId, 'active');
-      const quests = await firestoreService.getUserQuests(userId);
-      const progress = await firestoreService.getUserProgress(userId, 7);
-
-      const integratedProfile = this.convertFromFirebaseData(
-        firebaseProfile,
-        goals,
-        quests,
-        progress
-      );
-
-      await this.cacheProfile(integratedProfile);
-      
-      console.log('✅ Profile loaded from Firebase:', {
-        userId: integratedProfile.userId,
-        questCount: integratedProfile.initialQuests.length,
-      });
-
-      return integratedProfile;
-    } catch (error) {
-      console.error('❌ Error loading profile from Firebase:', error);
-      return null;
     }
   }
 }

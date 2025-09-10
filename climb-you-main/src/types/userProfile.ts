@@ -118,34 +118,52 @@ export interface AppSettings {
 }
 
 /**
+ * 今日のクエストタスク構造
+ */
+export interface TodayQuest {
+  title: string;
+  deliverable: string;
+  completed: boolean;
+  timeEstimate?: number;
+  status?: string;
+}
+
+/**
  * ユーザー進捗データ
  */
 export interface UserProgress {
   // 全体統計
   totalQuestsCompleted: number;
-  totalTimeSpent: number; // minutes
+  totalTimeSpent?: number; // minutes
   currentStreak: number; // days
   
   // 今日の進捗
-  todaysQuests: Quest[];
-  todaysProgress: {
+  todaysQuests: TodayQuest[];
+  todaysProgress?: {
     completed: number;
     total: number;
-    timeSpent: number;
+    timeSpent?: number;
   };
   
   // 今週の進捗
-  weeklyProgress: {
+  weeklyProgress?: number[] | {
     questsCompleted: number;
     timeSpent: number;
     daysActive: number;
   };
   
+  // 追加フィールド (既存のコードとの互換性のため)
+  completedQuests?: number;
+  totalQuests?: number;
+  skillProgression?: { [key: string]: any };
+  mountainProgress?: number;
+  lastQuestCompleted?: any;
+  
   // マイルストーン達成
-  milestonesReached: string[];
+  milestonesReached?: string[];
   
   // 最終活動
-  lastActiveAt: Date;
+  lastActiveAt?: Date;
 }
 
 /**
