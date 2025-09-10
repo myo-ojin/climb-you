@@ -14,7 +14,7 @@ import {
   DocumentData,
   QueryDocumentSnapshot
 } from 'firebase/firestore';
-import { firebaseConfig } from './config';
+import { getFirebaseFirestore } from '../../config/firebaseConfig';
 
 // Firestore collections
 export const COLLECTIONS = {
@@ -70,7 +70,7 @@ export interface QuestDocument {
 
 class FirestoreService {
   private get db() {
-    return firebaseConfig.getFirestore();
+    return getFirebaseFirestore();
   }
 
   // Generic methods
