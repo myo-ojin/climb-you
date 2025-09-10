@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Alert, StyleSheet } from 'react-native';
-import { firebaseConfig } from '../services/firebase/config';
+import { signInAnonymousUser } from '../config/firebaseConfig';
 import { hybridStorageService } from '../services/storage/hybridStorage';
 
 const QuickFirebaseTest: React.FC = () => {
@@ -17,8 +17,8 @@ const QuickFirebaseTest: React.FC = () => {
       
       // 2. Anonymous認証テスト
       try {
-        const user = await firebaseConfig.signInAnonymously();
-        results.push(`👤 Anonymous認証: 成功 (${user.uid.substring(0, 8)}...)`);
+        const userId = await signInAnonymousUser();
+        results.push(`👤 Anonymous認証: 成功 (${userId.substring(0, 8)}...)`);
         
         // 3. Hybrid Storageテスト
         try {

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Alert, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { EnvironmentConfig } from '../config/environmentConfig';
-import { firebaseConfig } from '../services/firebase/config';
 import { hybridStorageService } from '../services/storage/hybridStorage';
 import { advancedQuestService, ProfileV1 } from '../services/ai/advancedQuestService.fixed';
 import { aiInitializationService, AIInitializationResult } from '../services/ai/aiInitializationService';
@@ -16,7 +15,7 @@ import { runAllBranchingTests, runTestCategory, TestSuite } from '../utils/branc
 import { userProfileService } from '../services/userProfileService';
 import { firebaseUserProfileService } from '../services/firebase/firebaseUserProfileService';
 import { firestoreService } from '../services/firebase/firestoreService';
-import { initializeFirebaseServices, getCurrentUserId, getFirebaseStatus } from '../config/firebaseConfig';
+import { initializeFirebaseServices, getCurrentUserId, getFirebaseStatus, signInAnonymousUser } from '../config/firebaseConfig';
 import { IntegratedUserProfile, CompleteOnboardingData } from '../types/userProfile';
 
 export default function ProfileScreen() {
@@ -48,9 +47,9 @@ export default function ProfileScreen() {
   }, []);
 
   const checkServices = async () => {
-    const currentUser = firebaseConfig.getCurrentUser();
-    if (currentUser) {
-      setUserId(currentUser.uid);
+    const currentUserId = await getCurrentUserId();
+    if (currentUserId) {
+      setUserId(currentUserId);
       setConnectionStatus('匿名認証済み');
       await checkSyncStatus();
     } else {
@@ -102,8 +101,8 @@ export default function ProfileScreen() {
       
       // Anonymous認証テスト
       try {
-        const user = await firebaseConfig.signInAnonymously();
-        setUserId(user.uid);
+        const userId = await signInAnonymousUser();
+        setUserId(userId);
         setConnectionStatus('匿名認証済み');
         results.push(`✅ 匿名認証成功: ${user.uid.substring(0, 8)}...`);
         
@@ -760,8 +759,8 @@ export default function ProfileScreen() {
       
       // Ensure user is authenticated
       if (!userId) {
-        const user = await firebaseConfig.signInAnonymously();
-        setUserId(user.uid);
+        const userId = await signInAnonymousUser();
+        setUserId(userId);
         results.push(`🔐 匿名認証完了: ${user.uid.substring(0, 8)}...`);
       }
       
@@ -903,8 +902,8 @@ export default function ProfileScreen() {
       // Ensure authentication
       if (!userId) {
         results.push('🔐 匿名認証を実行中...');
-        const user = await firebaseConfig.signInAnonymously();
-        setUserId(user.uid);
+        const userId = await signInAnonymousUser();
+        setUserId(userId);
         results.push(`✅ 匿名認証成功: ${user.uid}`);
       }
       
@@ -974,8 +973,8 @@ export default function ProfileScreen() {
       results.push('');
       results.push('Test 1: Firebase接続確認...');
       if (!userId) {
-        const user = await firebaseConfig.signInAnonymously();
-        setUserId(user.uid);
+        const userId = await signInAnonymousUser();
+        setUserId(userId);
         results.push(`✅ 匿名認証: ${user.uid.substring(0, 8)}...`);
       } else {
         results.push(`✅ 既存ユーザー: ${userId.substring(0, 8)}...`);
@@ -1143,8 +1142,8 @@ export default function ProfileScreen() {
       
       // Ensure authentication
       if (!userId) {
-        const user = await firebaseConfig.signInAnonymously();
-        setUserId(user.uid);
+        const userId = await signInAnonymousUser();
+        setUserId(userId);
         results.push(`🔐 匿名認証: ${user.uid.substring(0, 8)}...`);
       }
 

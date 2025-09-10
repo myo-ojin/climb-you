@@ -98,7 +98,7 @@ class HybridStorageService {
     
     const goal: GoalDocument = {
       id: tempId,
-      userId: user.uid,
+      userId: userId,
       createdAt: timestamp as any,
       isCompleted: false,
       ...goalData,
@@ -111,8 +111,8 @@ class HybridStorageService {
   }
 
   async createQuest(questData: Omit<QuestDocument, 'id' | 'userId' | 'createdAt'>): Promise<string> {
-    const user = firebaseConfig.getCurrentUser();
-    if (!user) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
       throw new Error('User not authenticated');
     }
 
@@ -121,7 +121,7 @@ class HybridStorageService {
     
     const quest: QuestDocument = {
       id: tempId,
-      userId: user.uid,
+      userId: userId,
       createdAt: timestamp as any,
       isCompleted: false,
       ...questData,
@@ -246,14 +246,14 @@ class HybridStorageService {
   }
 
   private async pullFromFirestore(): Promise<void> {
-    const user = firebaseConfig.getCurrentUser();
-    if (!user) return;
+    const userId = await getCurrentUserId();
+    if (!userId) return;
 
     try {
       const [firestoreUser, firestoreGoals, firestoreQuests] = await Promise.all([
-        firestoreService.getUser(user.uid),
-        firestoreService.getUserGoals(user.uid),
-        firestoreService.getUserQuests(user.uid, 50),
+        firestoreService.getUser(userId),
+        firestoreService.getUserGoals(userId),
+        firestoreService.getUserQuests(userId, 50),
       ]);
 
       if (firestoreUser) {

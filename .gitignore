@@ -5,6 +5,9 @@ node_modules/
 dist/
 build/
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # Android / iOS (if present)
 android/app/build/
@@ -18,8 +21,9 @@ ios/Pods/
 .vscode/
 .DS_Store
 *.iml
+Thumbs.db
 
-# Environment
+# Environment & Config
 .env
 .env.local
 !.env.example
@@ -37,4 +41,24 @@ __pycache__/
 # Coverage & artifacts
 coverage/
 *.coverage
+
+# Claude Code / AI tools
+.claude/
+*.claude.json*
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# OS generated files
+.DS_Store?
+ehthumbs.db
+Thumbs.db
+
+# Logs
+.serena/logs/
+serena/logs/
+logs/
 
