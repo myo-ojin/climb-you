@@ -986,8 +986,16 @@ class AdvancedQuestService {
     skillAtoms: SkillAtom[];
     checkins?: DailyCheckins;
   }): Promise<Quest[]> {
+    console.log('🗡️ AdvancedQuestService.generateDailyQuests called');
+    console.log('🗡️ Input args:', {
+      profile: args.profile?.goal || 'No goal',
+      skillAtomsCount: args.skillAtoms?.length || 0,
+      checkins: args.checkins || 'Using defaults'
+    });
+
     if (!this.llm) {
       const diagnosis = this.getDiagnosticInfo();
+      console.error('🗡️ LLM not initialized:', diagnosis);
       throw new Error(`AdvancedQuestService not initialized. API Key available: ${diagnosis.apiKeyAvailable}. Call initialize() first.`);
     }
 
@@ -997,20 +1005,29 @@ class AdvancedQuestService {
       focus_noise: "mid"
     };
 
+    console.log('🗡️ Building derived profile data...');
     const derived = buildDerived(args.profile);
+    console.log('🗡️ Derived data built:', derived);
+
+    console.log('🗡️ Building daily quest prompt...');
     const prompt = buildDailyQuestsPrompt({
       profile: args.profile,
       derived,
       skillAtoms: args.skillAtoms,
       checkins
     });
+    console.log('🗡️ Prompt length:', prompt.length, 'chars');
 
     try {
+      console.log('🗡️ Calling LLM for quest generation...');
       const { quests } = await this.llm.completeJson({ 
         system: "You are a precise learning planner.", 
         prompt, 
         schema: QuestListSchema 
       });
+
+      console.log('🗡️ LLM returned quests:', quests?.length || 0);
+      console.log('🗡️ Generated quests:', quests);
 
       // 設計書の後処理を適用
       const rounded = quests.map((q) => ({
@@ -1018,9 +1035,11 @@ class AdvancedQuestService {
         minutes: clampToSession(q.minutes, args.profile.preferred_session_length_min ?? 20),
       }));
 
+      console.log('🗡️ Final processed quests:', rounded);
       return rounded;
     } catch (error) {
-      console.error('Daily quest generation failed:', error);
+      console.error('🗡️ Daily quest generation failed:', error);
+      console.error('🗡️ Error details:', error.message, error.stack);
       throw new Error('本日のクエスト生成に失敗しました');
     }
   }

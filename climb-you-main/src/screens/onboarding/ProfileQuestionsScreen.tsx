@@ -53,10 +53,18 @@ export default function ProfileQuestionsScreen({ navigation, route }: ProfileQue
   const currentOptions = aiGeneratedOptions[currentQuestion.id] || currentQuestion.options;
 
   const handleOptionSelect = (option: string) => {
-    setAnswers(prev => ({
-      ...prev,
-      [currentQuestion.id]: option
-    }));
+    console.log(`🔹 Option Select Debug - Question: ${currentQuestion.id}, Selected Option: ${option}`);
+    console.log(`🔹 Current Answer Before: ${answers[currentQuestion.id]}`);
+    
+    setAnswers(prev => {
+      const newAnswers = {
+        ...prev,
+        [currentQuestion.id]: option
+      };
+      console.log(`🔹 New Answer After: ${newAnswers[currentQuestion.id]}`);
+      console.log(`🔹 Full Answers Object:`, newAnswers);
+      return newAnswers;
+    });
   };
 
   // AI question generation for Block A and C dependent questions
@@ -77,11 +85,43 @@ export default function ProfileQuestionsScreen({ navigation, route }: ProfileQue
       let prompt = '';
       let shouldGenerate = false;
 
+      // Block A1: Goal-specific focus options
+      if (question.id === 'A1') {
+        shouldGenerate = true;
+        const userGoal = goalText || goalDeepDiveData.goal_text || 'general learning';
+        
+        prompt = `ユーザーの目標に最適化された学習フォーカスの選択肢を生成してください：
+
+ユーザーの目標: ${userGoal}
+
+質問: "どんなことを目指していますか？"
+
+各選択肢は以下の4つのカテゴリに対応し、ユーザーの目標に合わせてカスタマイズしてください：
+1. 知識・理解重視の選択肢 (goal_focus=knowledge)
+2. スキル・実践重視の選択肢 (goal_focus=skill) 
+3. 結果・成果重視の選択肢 (goal_focus=outcome)
+4. 継続・習慣重視の選択肢 (goal_focus=habit)
+
+各選択肢は：
+- 30文字以内で具体的
+- ユーザーの目標領域に密接に関連
+- 自然な日本語表現
+- 学習者の動機を適切に表現
+
+JSON形式で回答してください：
+[
+  { "id": "knowledge", "label": "選択肢1", "value": "knowledge", "dataKey": "goal_focus" },
+  { "id": "skill", "label": "選択肢2", "value": "skill", "dataKey": "goal_focus" },
+  { "id": "outcome", "label": "選択肢3", "value": "outcome", "dataKey": "goal_focus" },
+  { "id": "habit", "label": "選択肢4", "value": "habit", "dataKey": "goal_focus" }
+]`;
+      }
+
       // Block A2: Goal-specific follow-up questions
-      if (question.id === 'A2' && answers['A1']) {
+      else if (question.id === 'A2' && answers['A1']) {
         shouldGenerate = true;
         const goalFocus = answers['A1'];
-        const userGoal = goalText || goalDeepDiveData.goal || 'general learning';
+        const userGoal = goalText || goalDeepDiveData.goal_text || 'general learning';
         
         prompt = `以下のユーザーの目標と志向に基づいて、より具体的な4つの選択肢を生成してください：
 
@@ -109,7 +149,7 @@ JSON形式で回答してください：
       else if (question.id === 'A3' && answers['A2']) {
         shouldGenerate = true;
         const specificGoal = answers['A2'];
-        const userGoal = goalText || goalDeepDiveData.goal || 'general learning';
+        const userGoal = goalText || goalDeepDiveData.goal_text || 'general learning';
         
         prompt = `以下のユーザーの目標と具体的なアプローチに基づいて、学習範囲に関する4つの選択肢を生成してください：
 
@@ -133,11 +173,45 @@ JSON形式で回答してください：
 ]`;
       }
 
+      // Block C1: Goal-specific evidence confirmation methods
+      else if (question.id === 'C1') {
+        shouldGenerate = true;
+        const userGoal = goalText || goalDeepDiveData.goal_text || 'general learning';
+        const goalFocus = answers['A1'] || 'general';
+        
+        prompt = `ユーザーの目標と学習フォーカスに最適化された成果確認方法の選択肢を生成してください：
+
+ユーザーの目標: ${userGoal}
+学習フォーカス: ${goalFocus}
+
+質問: "「できた！」をどうやって確認したいですか？"
+
+各選択肢は以下の4つのカテゴリに対応し、ユーザーの目標に合わせてカスタマイズしてください：
+1. テスト・試験・スコア重視 (goal_evidence=credential_score)
+2. 作品・デモ・ポートフォリオ重視 (goal_evidence=portfolio_demo)
+3. 実績・実務・本番重視 (goal_evidence=realworld_result)
+4. 発表・レビュー・評価重視 (goal_evidence=presentation_review)
+
+各選択肢は：
+- 30文字以内で具体的
+- ユーザーの目標と学習フォーカスに最適
+- 実際に取り組める現実的な確認方法
+- 達成感を感じられる表現
+
+JSON形式で回答してください：
+[
+  { "id": "credential_score", "label": "選択肢1", "value": "credential_score", "dataKey": "goal_evidence" },
+  { "id": "portfolio_demo", "label": "選択肢2", "value": "portfolio_demo", "dataKey": "goal_evidence" },
+  { "id": "realworld_result", "label": "選択肢3", "value": "realworld_result", "dataKey": "goal_evidence" },
+  { "id": "presentation_review", "label": "選択肢4", "value": "presentation_review", "dataKey": "goal_evidence" }
+]`;
+      }
+
       // Block C2: KPI shape questions based on C1
       else if (question.id === 'C2' && answers['C1']) {
         shouldGenerate = true;
         const evidenceType = answers['C1'];
-        const userGoal = goalText || goalDeepDiveData.goal || 'general learning';
+        const userGoal = goalText || goalDeepDiveData.goal_text || 'general learning';
         
         prompt = `あなたは経験豊富なコーチです。ユーザーの個人的な成長目標に最適な測定・評価方法を提案してください。
 
@@ -171,7 +245,7 @@ JSON形式で回答：
       else if (question.id === 'C3' && answers['C2']) {
         shouldGenerate = true;
         const kpiShape = answers['C2'];
-        const userGoal = goalText || goalDeepDiveData.goal || 'general learning';
+        const userGoal = goalText || goalDeepDiveData.goal_text || 'general learning';
         
         prompt = `あなたは成果創出の専門家です。ユーザーの目標達成を最も効果的に実感・活用できる成果物・アウトプット形式を提案してください。
 
@@ -238,11 +312,11 @@ JSON形式で回答：
   // Generate AI options when question changes and requires them
   useEffect(() => {
     const question = currentQuestion;
-    console.log(`🔍 AI Generation Check: questionId=${question.id}, needsAI=${['A2', 'A3', 'C2', 'C3'].includes(question.id)}, alreadyGenerated=${!!aiGeneratedOptions[question.id]}`);
+    console.log(`🔍 AI Generation Check: questionId=${question.id}, needsAI=${['A1', 'A2', 'A3', 'C1', 'C2', 'C3'].includes(question.id)}, alreadyGenerated=${!!aiGeneratedOptions[question.id]}`);
     
-    if (['A2', 'A3', 'C2', 'C3'].includes(question.id) && !aiGeneratedOptions[question.id]) {
+    if (['A1', 'A2', 'A3', 'C1', 'C2', 'C3'].includes(question.id) && !aiGeneratedOptions[question.id]) {
       console.log(`🤖 Triggering AI generation for question ${question.id}`);
-      generateAiOptions(question, goalDeepDiveData.goal);
+      generateAiOptions(question, goalDeepDiveData.goal_text);
     }
   }, [currentQuestionIndex, answers]);
 
@@ -301,7 +375,7 @@ JSON形式で回答：
             <Text style={styles.questionText}>{currentQuestion.question}</Text>
             
             <View style={styles.optionsContainer}>
-              {loadingAiOptions && ['A2', 'A3', 'C2', 'C3'].includes(currentQuestion.id) && (
+              {loadingAiOptions && ['A1', 'A2', 'A3', 'C1', 'C2', 'C3'].includes(currentQuestion.id) && (
                 <View style={styles.loadingContainer}>
                   <Text style={styles.loadingText}>🤖 目標に応じた質問を生成中...</Text>
                 </View>

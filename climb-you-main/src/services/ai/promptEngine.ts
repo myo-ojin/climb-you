@@ -37,6 +37,10 @@ export const ProfileV1Schema = z.object({
     .default(["note"]),
   weekly_minimum_commitment_min: z.number().int().min(60).max(600).default(120),
   goal_motivation: z.enum(["low","mid","high"]).default("mid"),
+  // Phase 0 additions for milestone planning
+  weekly_hours: z.number().int().min(1).max(40).optional(),
+  resources: z.array(z.string()).max(10).default([]),
+  constraints: z.array(z.string()).max(10).default([]),
   createdAt: z.number().optional(),
   updatedAt: z.number().optional(),
 });
@@ -57,6 +61,8 @@ export const DailyCheckinSchema = z.object({
   mood_energy: z.enum(["low", "mid", "high"]).default("mid"),
   available_time_today_delta_min: z.number().int().min(-60).max(60).default(0),
   focus_noise: z.enum(["low", "mid", "high"]).default("mid"),
+  // Phase 0 addition for adaptive quest generation
+  day_type: z.enum(["busy", "normal", "deep"]).default("normal"),
 });
 
 export type DailyCheckins = z.infer<typeof DailyCheckinSchema>;
@@ -101,6 +107,11 @@ export const QuestSchema = z.object({
     .array(z.object({ q: z.string(), a: z.string() }))
     .default([]),
   tags: z.array(z.string()).min(1),
+  // Phase 0 additions for one-day completion guarantees
+  done_definition: z.string().min(4).optional(),
+  evidence: z.array(z.string()).max(3).default([]),
+  alt_plan: z.string().min(4).optional(),
+  stop_rule: z.string().min(4).optional(),
 });
 
 export type Quest = z.infer<typeof QuestSchema>;
@@ -123,16 +134,77 @@ export const ConstraintsSchema = z.object({
 export type Constraints = z.infer<typeof ConstraintsSchema>;
 
 // -----------------------------
+// Phase 0: New schemas for milestone and profile question planning
+// -----------------------------
+
+export const MilestoneSchema = z.object({
+  id: z.string().min(3),
+  title: z.string().min(4),
+  description: z.string().min(10),
+  due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  KPI: z.object({
+    metric: z.string().min(2),
+    target: z.string().min(1),
+  }),
+  evidence: z.array(z.string()).min(1).max(3),
+  resources: z.array(z.string()).default([]),
+  dependencies: z.array(z.string()).default([]),
+  risk_flags: z.array(z.enum(["overload", "dependency", "uncertainty"])).default([]),
+  feasibility: z.object({
+    time_ok: z.boolean(),
+    risk_score: z.number().min(0).max(1),
+  }),
+});
+
+export type Milestone = z.infer<typeof MilestoneSchema>;
+
+export const MilestonePlanSchema = z.object({
+  milestones: z.object({
+    Now: z.array(MilestoneSchema).min(1).max(3),
+    Next: z.array(MilestoneSchema).min(1).max(4),
+    Later: z.array(MilestoneSchema).min(1).max(3),
+  }),
+  rationale: z.array(z.string()).default([]),
+});
+
+export type MilestonePlan = z.infer<typeof MilestonePlanSchema>;
+
+export const ProfileQuestionSchema = z.object({
+  id: z.string().min(2),
+  type: z.enum(["multiple_choice", "text", "scale", "boolean", "confirm_yes_no"]),
+  question: z.string().min(4),
+  options: z.array(z.string()).optional(),
+  dataKey: z.string().min(2),
+  applicable_when: z.string().optional(),
+  info_gain_hint: z.number().min(0).max(1).optional(),
+  rationale: z.string().optional(),
+  score: z.number().optional(),
+});
+
+export type ProfileQuestion = z.infer<typeof ProfileQuestionSchema>;
+
+export const ProfileQuestionPlanSchema = z.object({
+  questions: z.array(ProfileQuestionSchema).min(1).max(8),
+  skipped: z.array(z.string()).default([]),
+  budget: z.object({
+    used: z.number().int().min(0),
+    remaining: z.number().int().min(0),
+  }),
+});
+
+export type ProfileQuestionPlan = z.infer<typeof ProfileQuestionPlanSchema>;
+
+// -----------------------------
 // 2) 設計書のパターン定義を完全移植
 // -----------------------------
 
 export const PATTERN_DEFS: Record<Pattern, string> = {
   read_note_q:
-    "読む→要点メモ→自作3問（学んだ概念を3問に落とし込む）。短い見出しと箇条書き。",
+    "読む→要点メモ→自作3問(学んだ概念を3問に落とし込む)。短い見出しと箇条書き。",
   flashcards:
     "フラッシュカード作成→10分後セルフチェック。用語/定義/例の3面で。",
   build_micro:
-    "最小成果物を作る（小スクリプト/段落/図/1問演習）。完成条件を明確化。",
+    "最小成果物を作る(小スクリプト/段落/図/1問演習)。完成条件を明確化。",
   config_verify:
     "設定・構成を作り、検証コマンドやテストで通す。手順と期待結果を明記。",
   debug_explain:
@@ -144,7 +216,7 @@ export const PATTERN_DEFS: Record<Pattern, string> = {
   socratic:
     "AIと対話で問い詰める。立場→反論→再反論で判断根拠を強化。",
   shadowing:
-    "模写/追随（発話/コーディング）。環境制約に応じて発話→無音模写へ切替。",
+    "模写/追随(発話/コーディング)。環境制約に応じて発話→無音模写へ切替。",
   retrospective:
     "今日の学びの振り返り→明日の一手を箇条書きで決める。",
 };
@@ -240,7 +312,7 @@ export function buildSkillMapPrompt(args: {
 
 制約:
 - atom は 12–18 個。曖昧語を避け、汎用的で再利用可能な表現にする。
-- 各 atom に最低1つの representative_task を入れる（数値や条件を含め具体化）。
+- 各 atom に最低1つの representative_task を入れる(数値や条件を含め具体化)。
 - 法律名や固有名詞など確証が必要な場合は、"representative_tasks" に "一次情報を確認" ステップを含める。
 
 <GOAL_TEXT>
@@ -264,12 +336,12 @@ ${patternsDoc}
 
 制約:
 - 合計分数 ≤ daily_capacity_min + available_time_today_delta_min
-- minutes は preferred_session_length_min に近づける（±5分で丸め可）
-- novelty_ratio を尊重（新規:反復の配合）
+- minutes は preferred_session_length_min に近づける(±5分で丸め可)
+- novelty_ratio を尊重(新規:反復の配合)
 - 同種 pattern の連続は避ける
-- env_constraints と hard_constraints を尊重（例: 音声不可→発話型は模写に置換）
-- **クエストは提示のみ**（手取り足取りの解説や長い手順は不要）。steps は任意（入れる場合は要点のみ・最大3行）。
-- 各クエストの difficulty は difficulty_hint（±0.1）に合わせる。
+- env_constraints と hard_constraints を尊重(例: 音声不可→発話型は模写に置換)
+- **クエストは提示のみ**(手取り足取りの解説や長い手順は不要)。steps は任意(入れる場合は要点のみ・最大3行)。
+- 各クエストの difficulty は difficulty_hint(±0.1)に合わせる。
 
 <PROFILE_JSON>
 ${JSON.stringify(profile)}
@@ -336,7 +408,7 @@ export function buildConstraints(profile: ProfileV1, derived: Derived, checkins:
 }
 
 // -----------------------------
-// 6) 後処理ヘルパー（設計書完全移植）
+// 6) 後処理ヘルパー(設計書完全移植)
 // -----------------------------
 
 export function clampToSession(minutes: number, session: number): number {
@@ -363,4 +435,276 @@ export function avoidConsecutiveSamePattern(quests: Quest[]): Quest[] {
     }
   }
   return out;
+}
+
+// -----------------------------
+// Phase 0: Enhanced prompt builders with new features
+// -----------------------------
+
+export function buildEnhancedDailyQuestsPrompt(args: {
+  profile: ProfileV1;
+  derived: Derived;
+  skillAtoms: SkillAtom[];
+  checkins: DailyCheckins;
+  constraints: Constraints;
+}): string {
+  const { profile, derived, skillAtoms, checkins, constraints } = args;
+  
+  // Phase 0: day_type adaptation for time budgets
+  const dayTypeTimeMap = {
+    busy: Math.min(45, constraints.total_minutes_max),
+    normal: Math.min(90, constraints.total_minutes_max), 
+    deep: Math.min(150, constraints.total_minutes_max),
+  };
+  const adaptedTimeMax = dayTypeTimeMap[checkins.day_type] || constraints.total_minutes_max;
+  const questCountByDayType = {
+    busy: 2,
+    normal: 3,
+    deep: 4,
+  };
+  const suggestedQuestCount = questCountByDayType[checkins.day_type] || 3;
+
+  const patternsDoc = patternsForPrompt();
+  
+  return `あなたは一日完了保証のプランナーです。以下の条件から、本日確実に完了可能なクエスト ${suggestedQuestCount} 件を JSON で返してください。
+
+重要: 今日のタイプは "${checkins.day_type}" です。このタイプに応じた時間配分と難易度調整を行ってください。
+
+## day_type別制約
+- busy: 最大45分、2-3クエスト、軽めの難易度
+- normal: 最大90分、3クエスト、標準難易度  
+- deep: 最大150分、3-4クエスト、挑戦的な難易度も可
+
+## 必須条件
+- 合計時間 ≤ ${adaptedTimeMax}分
+- 各クエスト ≤ 45分
+- done_definition: 明確な完了条件を必須
+- evidence: 完了の証拠(ファイル・スクリーンショット・スコアなど)
+- alt_plan: 時短版または室内版の代替案
+- stop_rule: 詰まった時の中断ルール(例：10分悩んだら代替案へ)
+
+## パターン定義
+${patternsDoc}
+
+## 自己批評基準
+- 関連性 ≥ 0.85(目標との関連度)
+- 実現可能性 ≥ 0.8(当日完了可能性)
+- 具体性 ≥ 0.85(曖昧さの排除)
+- 時間超過 = 0%(予算内確実収束)
+
+<PROFILE_JSON>
+${JSON.stringify(profile)}
+</PROFILE_JSON>
+<DERIVED_JSON>
+${JSON.stringify(derived)}
+</DERIVED_JSON>
+<SKILL_ATOMS_JSON>
+${JSON.stringify(skillAtoms)}
+</SKILL_ATOMS_JSON>
+<CHECKINS_JSON>
+${JSON.stringify(checkins)}
+</CHECKINS_JSON>
+
+出力フォーマット:
+{
+  "quests": [
+    {
+      "title": "具体的なタイトル",
+      "pattern": "適切なパターン",
+      "minutes": 30,
+      "difficulty": 0.6,
+      "deliverable": "成果物の説明",
+      "steps": ["手順1", "手順2", "手順3"],
+      "criteria": ["評価基準1", "評価基準2"],
+      "done_definition": "完了時の測定可能な状態",
+      "evidence": ["ファイル保存", "スクリーンショット"],
+      "alt_plan": "時短・屋内版の代替手順",
+      "stop_rule": "10分以上詰まったら alt_plan に切り替え",
+      "tags": ["関連タグ"]
+    }
+  ],
+  "rationale": ["選択理由と調整内容"]
+}`;
+}
+
+export function buildMilestonePrompt(args: {
+  goal_text: string;
+  category: string;
+  weekly_hours?: number;
+  resources?: string[];
+  constraints?: string[];
+  horizon_weeks?: number;
+}): string {
+  const { goal_text, category, weekly_hours, resources, constraints, horizon_weeks } = args;
+  
+  return `あなたはSMARTマイルストーン策定のエキスパートです。バックキャスト手法で実現可能なマイルストーンを作成してください。
+
+**目標:**${goal_text}
+**カテゴリ:**${category}
+**週間予算:**${weekly_hours || 'N/A'}時間
+**利用可能リソース:**${JSON.stringify(resources || [])}
+**制約条件:**${JSON.stringify(constraints || [])}
+**期間:**${horizon_weeks || 12}週間
+
+## バックキャスト手順
+1. 最終成果から逆算してKPI連鎖を構築
+   - Outcome KPI(最終成果指標)
+   - Intermediate KPI(中間指標)  
+   - Behavior KPI(行動指標)
+
+2. 時期区分でマイルストーンをグループ化
+   - Now(1-2週): 即座に着手できる基礎固め
+   - Next(3-6週): 中核スキル・知識の構築
+   - Later(7週以降): 統合・応用・成果創出
+
+## 必須要素
+- SMART基準(Specific, Measurable, Achievable, Relevant, Time-bound)
+- 実現可能性スコア ≥ 0.8(低い場合は自動修正)
+- 証拠・依存関係・リスク要因の明記
+
+出力フォーマット:
+{
+  "milestones": {
+    "Now": [
+      {
+        "id": "ms_1",
+        "title": "具体的なマイルストーン名",
+        "description": "詳細な説明",
+        "due_date": "2025-01-15",
+        "KPI": {
+          "metric": "測定指標名",
+          "target": "数値目標"
+        },
+        "evidence": ["証拠1", "証拠2"],
+        "resources": ["必要リソース"],
+        "dependencies": ["依存するマイルストーン"],
+        "risk_flags": ["overload", "dependency", "uncertainty"],
+        "feasibility": {
+          "time_ok": true,
+          "risk_score": 0.2
+        }
+      }
+    ],
+    "Next": [...],
+    "Later": [...]
+  },
+  "rationale": ["策定理由と調整内容"]
+}`;
+}
+
+// -----------------------------
+// Phase 4: Few-shot RAG enhanced prompt builders
+// -----------------------------
+
+export function buildRAGEnhancedDailyQuestsPrompt(args: {
+  profile: ProfileV1;
+  derived: Derived;
+  skillAtoms: SkillAtom[];
+  checkins: DailyCheckins;
+  constraints: Constraints;
+  fewshotExamples?: string;
+  templateStructure?: {
+    commonPatterns: string[];
+    typicalQuestCount: number;
+    averageSessionLength: number;
+    requiredFields: string[];
+  };
+}): string {
+  const { profile, derived, skillAtoms, checkins, constraints, fewshotExamples, templateStructure } = args;
+  
+  const dayTypeTimeMap = {
+    busy: Math.min(45, constraints.total_minutes_max),
+    normal: Math.min(90, constraints.total_minutes_max), 
+    deep: Math.min(150, constraints.total_minutes_max),
+  };
+  const adaptedTimeMax = dayTypeTimeMap[checkins.day_type] || constraints.total_minutes_max;
+  const questCountByDayType = {
+    busy: 2,
+    normal: 3,
+    deep: 4,
+  };
+  const suggestedQuestCount = templateStructure?.typicalQuestCount || questCountByDayType[checkins.day_type] || 3;
+
+  const patternsDoc = patternsForPrompt();
+  
+  let fewshotSection = '';
+  if (fewshotExamples) {
+    fewshotSection = '## Examples: Successful Patterns for Similar Goals\n' +
+      'Please reference the following examples to generate quests with similar quality and style:\n\n' +
+      fewshotExamples + '\n\n' +
+      '## Template Structure (Recommended)\n' +
+      '- Common patterns: ' + (templateStructure?.commonPatterns?.join(', ') || 'N/A') + '\n' +
+      '- Average quest count: ' + (templateStructure?.typicalQuestCount || 3) + '\n' +
+      '- Average session length: ' + (templateStructure?.averageSessionLength || 30) + ' minutes\n' +
+      '- Required fields: ' + (templateStructure?.requiredFields?.join(', ') || 'done_definition, evidence, alt_plan, stop_rule') + '\n';
+  }
+  
+  return 'You are a one-day completion planner. Generate ' + suggestedQuestCount + ' quests that can be reliably completed today in JSON format.\n\n' +
+    'Important: Today is a "' + checkins.day_type + '" day. Adjust time allocation and difficulty accordingly.\n\n' +
+    '## day_type Constraints\n' +
+    '- busy: Max 45 minutes, 2-3 quests, light difficulty\n' +
+    '- normal: Max 90 minutes, 3 quests, standard difficulty\n' +
+    '- deep: Max 150 minutes, 3-4 quests, challenging difficulty allowed\n\n' +
+    '## Required Conditions\n' +
+    '- Total time <= ' + adaptedTimeMax + ' minutes\n' +
+    '- Each quest <= 45 minutes\n' +
+    '- done_definition: Clear completion criteria required\n' +
+    '- evidence: Completion proof (files, screenshots, scores)\n' +
+    '- alt_plan: Short version or indoor alternative\n' +
+    '- stop_rule: Rule for when stuck (e.g., switch to alt_plan after 10min)\n\n' +
+    fewshotSection + '\n' +
+    '## Pattern Definitions\n' +
+    patternsDoc + '\n\n' +
+    '## Self-Critique Standards (Phase 4 Enhanced)\n' +
+    '- Relevance >= 0.85 (goal relevance)\n' +
+    '- Feasibility >= 0.8 (same-day completion)\n' +
+    '- Specificity >= 0.85 (eliminate ambiguity)\n' +
+    '- Time overrun = 0% (reliable budget convergence)\n' +
+    '- Example consistency >= 0.8 (style/quality alignment)\n\n' +
+    '<PROFILE_JSON>\n' +
+    JSON.stringify(profile) + '\n' +
+    '</PROFILE_JSON>\n' +
+    '<DERIVED_JSON>\n' +
+    JSON.stringify(derived) + '\n' +
+    '</DERIVED_JSON>\n' +
+    '<SKILL_ATOMS_JSON>\n' +
+    JSON.stringify(skillAtoms) + '\n' +
+    '</SKILL_ATOMS_JSON>\n' +
+    '<CHECKINS_JSON>\n' +
+    JSON.stringify(checkins) + '\n' +
+    '</CHECKINS_JSON>\n\n' +
+    'Output Format:\n' +
+    '{\n' +
+    '  "quests": [\n' +
+    '    {\n' +
+    '      "title": "Specific title",\n' +
+    '      "pattern": "appropriate pattern",\n' +
+    '      "minutes": 30,\n' +
+    '      "difficulty": 0.6,\n' +
+    '      "deliverable": "Deliverable description",\n' +
+    '      "steps": ["Step 1", "Step 2", "Step 3"],\n' +
+    '      "criteria": ["Criteria 1", "Criteria 2"],\n' +
+    '      "done_definition": "Measurable completion state",\n' +
+    '      "evidence": ["File save", "Screenshot"],\n' +
+    '      "alt_plan": "Short/indoor alternative procedure",\n' +
+    '      "stop_rule": "Switch to alt_plan if stuck for 10+ minutes",\n' +
+    '      "tags": ["Related tags"]\n' +
+    '    }\n' +
+    '  ],\n' +
+    '  "rationale": ["Selection reasons and adjustments"],\n' +
+    '  "fewshot_alignment": ["Consistency explanation with examples"]\n' +
+    '}';
+}
+
+export function buildRAGEnhancedMilestonePrompt(args: {
+  goal_text: string;
+  category: string;
+  weekly_hours?: number;
+  resources?: string[];
+  constraints?: string[];
+  horizon_weeks?: number;
+  fewshotExamples?: string;
+}): string {
+  // Simplified fallback to basic milestone prompt
+  return buildMilestonePrompt(args);
 }
