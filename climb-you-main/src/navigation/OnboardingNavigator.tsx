@@ -22,7 +22,8 @@ export interface OnboardingData {
 }
 
 export type OnboardingStackParamList = {
-  GoalDeepDive: undefined;
+  GoalInput: undefined;
+  GoalDeepDive: { goalData: { goal: string; period: number; intensity: string; } };
   GoalCategory: {
     goalDeepDiveData: any;
   };

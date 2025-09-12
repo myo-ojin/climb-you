@@ -1,0 +1,86 @@
+迚ｹ險倅ｺ矩・ｼ・1蝗ｺ螳壹ぎ繧､繝会ｼ・- A1縺ｮ雉ｪ蝠乗枚縺ｯ縲後％縺ｮ蟄ｦ鄙偵〒譛繧る㍾隕悶＠縺溘＞隕ｳ轤ｹ縺ｯ縺ｩ繧後〒縺吶°・溘阪→縺吶ｋ縲・- A1縺ｮvalue縺ｯ豎守畑霆ｸﾃ鈴伜沺隱槭〒菴懊ｋ・井ｾ・ accuracy/speed/breadth/depth/fluency/retention/application ﾃ・繝峨Γ繧､繝ｳ隱橸ｼ峨・- value縺ｯ `<霆ｸ>_<荳ｻ隕∬ｪ・` 蠖｢蠑上・蜊願ｧ貞ｰ乗枚蟄励せ繝阪・繧ｯ繝ｻ24譁・ｭ嶺ｻ･蜀・ｼ井ｾ・ `fluency_speaking`, `accuracy_refactor`・峨・
+蜃ｺ蜉帛ｽ｢蠑擾ｼ亥宍螳茨ｼ・```json
+{
+  "blockTitle": "逶ｮ讓吶・辟ｦ轤ｹ",
+  "blockDescription": "${goalAnalysis.domain}縺ｮ逶ｮ讓呵ｨｭ螳壹ｒ蜈ｷ菴灘喧縺励∪縺・,
+  "questions": [
+    {"question": "窶ｦ", "options": [
+      {"id":"opt1","label":"窶ｦ","value":"窶ｦ","dataKey":"goal_focus"},
+      {"id":"opt2","label":"窶ｦ","value":"窶ｦ","dataKey":"goal_focus"},
+      {"id":"opt3","label":"窶ｦ","value":"窶ｦ","dataKey":"goal_focus"},
+      {"id":"opt4","label":"窶ｦ","value":"窶ｦ","dataKey":"goal_focus"}
+    ]},
+    {"question": "窶ｦ", "options": [
+      {"id":"opt1","label":"窶ｦ","value":"窶ｦ","dataKey":"domain_scenes"},
+      {"id":"opt2","label":"窶ｦ","value":"窶ｦ","dataKey":"domain_scenes"},
+      {"id":"opt3","label":"窶ｦ","value":"窶ｦ","dataKey":"domain_scenes"},
+      {"id":"opt4","label":"窶ｦ","value":"窶ｦ","dataKey":"domain_scenes"}
+    ]},
+    {"question": "窶ｦ", "options": [
+      {"id":"opt1","label":"窶ｦ","value":"窶ｦ","dataKey":"scope_style"},
+      {"id":"opt2","label":"窶ｦ","value":"窶ｦ","dataKey":"scope_style"},
+      {"id":"opt3","label":"窶ｦ","value":"窶ｦ","dataKey":"scope_style"},
+      {"id":"opt4","label":"窶ｦ","value":"窶ｦ","dataKey":"scope_style"}
+    ]}
+  ]
+}
+```
+
+閾ｪ蟾ｱ讀懈渊・亥・蜉帷峩蜑搾ｼ・- 3蝠湘怜推4謚槭°・重ataKey縺ｨvalue蝙九′蜷・撫縺ｧ荳雋ｫ縺励※縺・ｋ縺九・- 蜷・撫縺ｫ蝗ｺ譛芽ｪ槭′蜷ｫ縺ｾ繧後※縺・ｋ縺具ｼ医し繝悶ラ繝｡繧､繝ｳ/繧ｭ繝ｼ繝ｯ繝ｼ繝臥罰譚･・峨・- JSON縺ｮ縺ｿ縺具ｼ医ヵ繧ｧ繝ｳ繧ｹ螟悶↓譁・ｭ励′縺ｪ縺・ｼ峨・隕∽ｻｶ驕募渚縺後≠繧後・譛蟆丈ｿｮ豁｣縺励※縺九ｉ蜃ｺ蜉帙☆繧九％縺ｨ縲Ａ + "\n" + prompt;
+
+      const response = await advancedQuestService.generateCustom({
+        userGoal: `${goalAnalysis.domain} - ${goalAnalysis.subDomain}`,
+        timeConstraintMinutes: 30,
+        userPreferences: { difficulty: 'medium' },
+        customPrompt: finalPromptA
+      });
+
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No JSON found in BlockA AI response');
+      }
+
+      const blockData = JSON.parse(jsonMatch[0]);
+      
+      return {
+        blockId: 'A',
+        blockTitle: blockData.blockTitle || '逶ｮ讓吶・辟ｦ轤ｹ',
+        blockDescription: blockData.blockDescription || `${goalAnalysis.domain}縺ｮ逶ｮ讓呵ｨｭ螳壹ｒ蜈ｷ菴灘喧縺励∪縺兪,
+        questions: blockData.questions.map((q: any, index: number) => ({
+          id: `A${index + 1}`,
+          blockId: 'A' as const,
+          stepInBlock: (index + 1) as 1 | 2 | 3,
+          question: q.question,
+          options: q.options,
+          hasOptionalMemo: true,
+          goalContext: `${goalAnalysis.domain}蛻・㍽縺ｧ縺ｮ雉ｪ蝠・{index + 1}`
+        }))
+      };
+
+    } catch (error) {
+      console.error('BlockA AI generation failed, using fallback:', error);
+      return this.generateBlockA_Fallback(goalAnalysis);
+    }
+  }
+
+  /**
+   * 繝悶Ο繝・けB: 繝・Φ繝励Ξ迚・(蟄ｦ鄙呈婿驥・ - 豎守畑逧・   */
+  private generateBlockB_Template(goalAnalysis: GoalAnalysis): QuestionBlock {
+    return {
+      blockId: 'B',
+      blockTitle: '蟄ｦ鄙偵・騾ｲ繧∵婿',
+      blockDescription: '譁ｰ縺励＞縺薙→縺ｨ蠕ｩ鄙偵・繝舌Λ繝ｳ繧ｹ縲・ｻ蠎ｦ縲・屮譏灘ｺｦ繧定ｨｭ螳壹＠縺ｾ縺・,
+      questions: [
+        {
+          id: 'B1',
+          blockId: 'B',
+          stepInBlock: 1,
+          question: '譁ｰ縺励＞縺薙→繧貞ｭｦ縺ｶ縺ｮ縺ｨ蠕ｩ鄙偵√←縺｡繧峨′螟壹ａ縺後＞縺・〒縺吶°・・,
+          options: [
+            { id: 'new_heavy', label: '譁ｰ縺励＞縺薙→繧偵◆縺上＆繧灘ｭｦ縺ｳ縺溘＞', value: 0.75, dataKey: 'novelty_preference' },
+            { id: 'new_some', label: '譁ｰ縺励＞縺薙→繧貞ｰ代＠螟壹ａ縺ｫ', value: 0.60, dataKey: 'novelty_preference' },
+            { id: 'repeat_some', label: '蠕ｩ鄙偵ｒ蟆代＠螟壹ａ縺ｫ', value: 0.40, dataKey: 'novelty_preference' },
+            { id: 'repeat_heavy', label: '蠕ｩ鄙偵ｒ縺励▲縺九ｊ繧・ｊ縺溘＞', value: 0.25, dataKey: 'novelty_preference' }
+          ],
+          hasOptionalMemo: true,
+          goalContext: '蟄ｦ鄙偵↓縺翫￠繧区眠隕竣s蠕ｩ鄙偵・繝舌Λ繝ｳ繧ｹ險ｭ螳・

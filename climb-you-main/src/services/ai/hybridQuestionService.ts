@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { advancedQuestService } from './advancedQuestService.fixed';
 import { goalClarificationService, GoalClarificationNeeded } from './goalClarificationService';
 import { GoalAnalysis, AdaptiveQuestion, QuestionBlock } from './adaptiveQuestionService';
+import { ProfileQuestionEngine, buildProfileFromResponses } from './profileQuestionEngine';
 
 // ハイブリッド質問生成結果
 export interface HybridQuestionSet {
@@ -21,12 +22,86 @@ export interface HybridQuestionSet {
     templateBlocks: ('A' | 'B' | 'C' | 'D')[];
     totalApiCalls: number;
     generationTime: number;
+    profileOptimized?: boolean;
+    questionsSkipped?: number;
   };
 }
 
 class HybridQuestionService {
   /**
-   * メインエントリーポイント: ハイブリッド質問セット生成
+   * 拡張版: プロファイル質問エンジン統合版
+   * Phase 1 対応 - 情報ゲイン最適化とファティーグ最小化
+   */
+  async generateOptimizedQuestionSet(
+    goalText: string,
+    existingProfile?: Record<string, any>,
+    profileConfidence?: Record<string, number>
+  ): Promise<HybridQuestionSet> {
+    const startTime = Date.now();
+    let apiCalls = 0;
+
+    // Step 1: 曖昧性チェック
+    await goalClarificationService.validateGoalOrThrow(goalText);
+    apiCalls++;
+
+    // Step 2: 目標解析
+    const goalAnalysis = await this.analyzeGoal(goalText);
+    apiCalls++;
+
+    // Step 3: プロファイル質問エンジン適用 (Phase 1 新機能)
+    const knownProfile = {
+      fields: existingProfile || {},
+      confidence: profileConfidence || {}
+    };
+
+    const questionPlan = await ProfileQuestionEngine.generateQuestionPlan(
+      goalText,
+      knownProfile,
+      { maxQuestions: 5, allowRefine: true }
+    );
+
+    console.log('📊 Profile Question Plan:', {
+      selectedCount: questionPlan.questions.length,
+      skippedCount: questionPlan.skipped.length,
+      budgetUsed: questionPlan.budget.used,
+      rationale: questionPlan.rationale
+    });
+
+    // Step 4: 各ブロック生成 (最適化版)
+    const blocks: QuestionBlock[] = [];
+
+    // ブロックA: プロファイル最適化版 (AI生成 + 情報ゲイン)
+    blocks.push(await this.generateBlockA_ProfileOptimized(goalAnalysis, questionPlan));
+    apiCalls++;
+
+    // ブロックB: テンプレ (学習方針 - 汎用的)
+    blocks.push(this.generateBlockB_Template(goalAnalysis));
+
+    // ブロックC: プロファイル最適化版 (AI生成 + 情報ゲイン)
+    blocks.push(await this.generateBlockC_ProfileOptimized(goalAnalysis, questionPlan));
+    apiCalls++;
+
+    // ブロックD: テンプレ (継続対策 - 汎用的)
+    blocks.push(this.generateBlockD_Template(goalAnalysis));
+
+    const generationTime = Date.now() - startTime;
+
+    return {
+      goalAnalysis,
+      blocks,
+      generationMetadata: {
+        aiGeneratedBlocks: ['A', 'C'],
+        templateBlocks: ['B', 'D'],
+        totalApiCalls: apiCalls,
+        generationTime,
+        profileOptimized: true,
+        questionsSkipped: questionPlan.skipped.length
+      }
+    };
+  }
+
+  /**
+   * メインエントリーポイント: ハイブリッド質問セット生成 (従来版)
    */
   async generateHybridQuestionSet(goalText: string): Promise<HybridQuestionSet> {
     const startTime = Date.now();
@@ -425,6 +500,176 @@ class HybridQuestionService {
         }
       ]
     };
+  }
+
+  /**
+   * ブロックA: プロファイル最適化版 (Phase 1)
+   * 情報ゲインスコアリングに基づく高品質質問生成
+   */
+  private async generateBlockA_ProfileOptimized(
+    goalAnalysis: GoalAnalysis,
+    questionPlan: any
+  ): Promise<QuestionBlock> {
+    // 高スコア質問から目標焦点用を抽出
+    const focusQuestions = questionPlan.questions.filter((q: any) => 
+      q.category === 'goal_specifics' && q.score > 0.4
+    );
+
+    if (focusQuestions.length === 0) {
+      console.warn('No high-score focus questions found, falling back to AI generation');
+      return await this.generateBlockA_AI(goalAnalysis);
+    }
+
+    // プロファイル最適化プロンプト
+    const optimizedPrompt = `学習目標の焦点を明確にする質問を生成してください。以下の高情報ゲイン質問を参考に、より効果的な質問を作成してください。
+
+目標分野: ${goalAnalysis.domain} (${goalAnalysis.subDomain})
+学習タイプ: ${goalAnalysis.learningType}
+
+参考質問 (高情報ゲイン):
+${focusQuestions.map((q: any, i: number) => `${i + 1}. ${q.question} (スコア: ${q.score?.toFixed(2)})`).join('\n')}
+
+以下のJSON形式で3つの質問を生成してください:
+{
+  "blockTitle": "目標の焦点",
+  "blockDescription": "目標設定を具体化します",
+  "questions": [
+    {
+      "id": "A1",
+      "question": "質問1",
+      "options": [4つの選択肢],
+      "rationale": "この質問を選んだ理由"
+    },
+    // ... A2, A3
+  ]
+}
+
+必須要件:
+- 情報ゲインが高く、ユーザー疲労が少ない質問
+- ${goalAnalysis.domain}分野に特化
+- 既知情報との重複を避ける`;
+
+    try {
+      const response = await advancedQuestService.generateCustom({
+        userGoal: `${goalAnalysis.domain} - ${goalAnalysis.subDomain}`,
+        timeConstraintMinutes: 30,
+        userPreferences: { difficulty: 'medium' },
+        customPrompt: optimizedPrompt
+      });
+
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No JSON found in ProfileOptimized BlockA response');
+      }
+
+      const blockData = JSON.parse(jsonMatch[0]);
+      
+      return {
+        blockId: 'A',
+        blockTitle: blockData.blockTitle || '目標の焦点 (最適化)',
+        blockDescription: blockData.blockDescription || `${goalAnalysis.domain}の目標設定を最適化します`,
+        questions: blockData.questions.map((q: any, index: number) => ({
+          id: `A${index + 1}`,
+          blockId: 'A' as const,
+          stepInBlock: (index + 1) as 1 | 2 | 3,
+          question: q.question,
+          options: q.options || [
+            { id: 'opt1', label: '選択肢1', value: 'value1', dataKey: 'goal_focus' },
+            { id: 'opt2', label: '選択肢2', value: 'value2', dataKey: 'goal_focus' },
+            { id: 'opt3', label: '選択肢3', value: 'value3', dataKey: 'goal_focus' },
+            { id: 'opt4', label: '選択肢4', value: 'value4', dataKey: 'goal_focus' }
+          ],
+          hasOptionalMemo: true,
+          goalContext: `${goalAnalysis.domain}分野での最適化質問${index + 1}`
+        }))
+      };
+
+    } catch (error) {
+      console.error('ProfileOptimized BlockA generation failed, using standard AI:', error);
+      return await this.generateBlockA_AI(goalAnalysis);
+    }
+  }
+
+  /**
+   * ブロックC: プロファイル最適化版 (Phase 1)
+   * 成果確認方法の情報ゲイン最適化
+   */
+  private async generateBlockC_ProfileOptimized(
+    goalAnalysis: GoalAnalysis,
+    questionPlan: any
+  ): Promise<QuestionBlock> {
+    // 成果確認関連の高スコア質問を抽出
+    const evidenceQuestions = questionPlan.questions.filter((q: any) => 
+      (q.category === 'goal_specifics' && q.id.includes('metrics')) || 
+      (q.category === 'experience' && q.score > 0.3)
+    );
+
+    const optimizedPrompt = `成果の確認方法を設定する質問を生成してください。情報ゲインを最大化し、ユーザー疲労を最小化した効果的な質問を作成してください。
+
+目標分野: ${goalAnalysis.domain} (${goalAnalysis.subDomain})
+学習タイプ: ${goalAnalysis.learningType}
+
+${evidenceQuestions.length > 0 ? `参考質問 (高情報ゲイン):
+${evidenceQuestions.map((q: any, i: number) => `${i + 1}. ${q.question} (スコア: ${q.score?.toFixed(2)})`).join('\n')}` : ''}
+
+以下のJSON形式で3つの質問を生成してください:
+{
+  "blockTitle": "成果の確認方法",
+  "blockDescription": "学習成果をどう確認するかを設定します",
+  "questions": [
+    {
+      "id": "C1",
+      "question": "「できた！」をどうやって確認したいですか？",
+      "options": [4つの選択肢]
+    },
+    // ... C2, C3
+  ]
+}
+
+必須要件:
+- ${goalAnalysis.domain}分野に特化した評価方法
+- 既知情報との重複を避ける
+- 実現可能で具体的な選択肢`;
+
+    try {
+      const response = await advancedQuestService.generateCustom({
+        userGoal: `${goalAnalysis.domain} - ${goalAnalysis.subDomain}`,
+        timeConstraintMinutes: 30,
+        userPreferences: { difficulty: 'medium' },
+        customPrompt: optimizedPrompt
+      });
+
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No JSON found in ProfileOptimized BlockC response');
+      }
+
+      const blockData = JSON.parse(jsonMatch[0]);
+      
+      return {
+        blockId: 'C',
+        blockTitle: blockData.blockTitle || '成果の確認方法 (最適化)',
+        blockDescription: blockData.blockDescription || `${goalAnalysis.domain}の成果確認方法を最適化します`,
+        questions: blockData.questions.map((q: any, index: number) => ({
+          id: `C${index + 1}`,
+          blockId: 'C' as const,
+          stepInBlock: (index + 1) as 1 | 2 | 3,
+          question: q.question,
+          options: q.options || [
+            { id: 'opt1', label: '選択肢1', value: 'value1', dataKey: 'goal_evidence' },
+            { id: 'opt2', label: '選択肢2', value: 'value2', dataKey: 'goal_evidence' },
+            { id: 'opt3', label: '選択肢3', value: 'value3', dataKey: 'goal_evidence' },
+            { id: 'opt4', label: '選択肢4', value: 'value4', dataKey: 'goal_evidence' }
+          ],
+          hasOptionalMemo: true,
+          goalContext: `${goalAnalysis.domain}分野での最適化成果確認${index + 1}`
+        }))
+      };
+
+    } catch (error) {
+      console.error('ProfileOptimized BlockC generation failed, using standard AI:', error);
+      return await this.generateBlockC_AI(goalAnalysis);
+    }
   }
 
   // =====================

@@ -1,0 +1,143 @@
+metadata:
+  title: Tone & Readability Upgrade Plan (Friendly Microcopy)
+  version: 0.1.0
+  created: 2025-09-12
+  owners: ["ai-core", "design-ux", "mobile-core", "qa"]
+  intent: "Make quests, milestones, and questions easier and friendlier without breaking JSON contracts."
+
+principles:
+  - "Non-breaking: keep JSON keys/enums (English) intact"
+  - "Localize natural-language fields per locale; structure stays language-agnostic"
+  - "Two-layer approach: (1) tone-aware generation, (2) post-process tone rewriter"
+  - "Short, concrete, warm coaching voice; avoid imperative commands"
+
+scope:
+  modules: [profile_question_engine, milestone_engine, one_day_quest_builder]
+  locales:
+    initial: [en, ja]
+    later: [es, fr, de, ko, pt-BR, it, tr, vi, th, ru, ar, hi, id]
+
+tone_guidelines:
+  common:
+    voice: "Warm coach: encouraging, respectful, actionable"
+    structure_order: ["headline", "3_steps", "done_definition", "stuck_switch"]
+    avoid:
+      - "threatening or shaming language"
+      - "jargon and long noun stacks"
+      - "over-promising (e.g., 'instantly', 'simply')"
+    require:
+      - "2–3 steps max"
+      - "done_definition and alt_plan and stop_rule"
+  en:
+    sentence_length_max: 18   # words
+    total_words_per_quest_max: 120
+    replacements:
+      banned: ["must", "failure", "obviously", "simply", "just"]
+      prefer: ["can", "not yet", "step-by-step", "let’s", "try"]
+    bullets: "- "
+    time_unit: "min"
+  ja:
+    sentence_length_max_chars: 40
+    total_chars_per_quest_max: 240
+    replacements:
+      banned: ["必ず", "失敗", "当然", "単に", "すぐにできる"]
+      prefer: ["まずは", "まだ途中", "少しずつ", "いっしょに", "できそうな範囲で"]
+    bullets: "・"
+    time_unit: "分"
+
+prompt_locale_packs:
+  add_to_system:
+    - "Use a warm, encouraging coaching voice."
+    - "Keep sentences short and concrete; avoid commands; propose choices."
+    - "Return JSON only; schema keys/enums in English; natural-language fields in {{locale}}."
+    - "Each quest must include: done_definition, evidence, alt_plan, stop_rule (friendly and clear)."
+
+tone_rewriter:
+  inputs:
+    json_fields:
+      - profile_questions: ["question", "options[].label"]
+      - quest: ["title", "deliverable", "steps[]", "done_definition", "evidence[]", "alt_plan", "stop_rule"]
+      - milestone: ["title", "description"]
+  rules:
+    - "Apply locale-specific replacements (banned→prefer)"
+    - "Enforce sentence-length caps; split or simplify if needed"
+    - "Ensure order: headline → steps(<=3) → done → stuck"
+    - "Do not alter numeric values/pattern/enums/tags/minutes"
+  rubric_thresholds:
+    tone_readability: ">=0.85"
+    empathy: ">=0.85"
+    specificity: ">=0.85"
+
+microcopy_templates:
+  quest:
+    title: {
+      en: "Today’s step: {{result}} ({{minutes}} min)",
+      ja: "今日の一歩：{{result}}（{{minutes}}分）"
+    }
+    done_definition: {
+      en: "Done when {{result}} is achieved.",
+      ja: "{{result}}ができたら完了です。"
+    }
+    stop_rule: {
+      en: "If stuck >10 min, switch to ‘{{alt_plan}}’.",
+      ja: "10分以上つまったら『{{alt_plan}}』に切り替えましょう。"
+    }
+
+ci_checks:
+  - name: tone_lint
+    checks:
+      - "no banned terms per locale"
+      - "avg sentence length within caps"
+      - "presence of done/evidence/alt/stop in all quests"
+
+tasks:
+  - id: TONE-01
+    name: Extend PromptLocalePacks with tone directives
+    owners: [ai-core, design-ux]
+    estimate_days: 0.5
+    deliverables: ["src/services/ai/promptPacks/en/system.md", "src/services/ai/promptPacks/ja/system.md"]
+  - id: TONE-02
+    name: Add Tone Rewriter post-process in generation pipeline
+    owners: [ai-core]
+    estimate_days: 0.75
+    touch_points: ["enhancedQuestService final pass", "milestoneService string build", "profileQuestionEngine output"]
+  - id: TONE-03
+    name: Microcopy dictionaries (banned/prefer) + templates
+    owners: [design-ux]
+    estimate_days: 0.5
+    deliverables: ["assets/i18n/tone/en.json", "assets/i18n/tone/ja.json"]
+  - id: TONE-04
+    name: Tone lint helper (dev-only)
+    owners: [mobile-core]
+    estimate_days: 0.5
+    deliverables: ["scripts/i18n/tone_lint.ts"]
+  - id: TONE-05
+    name: QA checklist update (pseudo + busy/normal/deep samples)
+    owners: [qa]
+    estimate_days: 0.25
+    deliverables: ["docs/i18n/tone_qa.md"]
+
+acceptance_criteria:
+  - "All generated quests include done_definition/evidence/alt_plan/stop_rule with friendly wording"
+  - "No banned terms present for locale; tone lint passes"
+  - "Readability thresholds met (sentence-length caps)"
+  - "User QA (n>=10) avg rating ≥ 4.2/5 for clarity & friendliness"
+
+rollout:
+  - phase: A
+    locales: [en]
+    tasks: [TONE-01, TONE-02, TONE-03, TONE-04, TONE-05]
+  - phase: B
+    locales: [ja]
+    tasks: [TONE-01, TONE-02, TONE-03, TONE-04, TONE-05]
+  - phase: C
+    locales: [es, fr, de, ko, pt-BR, it, tr, vi, th, ru, ar, hi, id]
+    tasks: [TONE-01, TONE-03, TONE-05]
+
+status:
+  TONE-01: pending
+  TONE-02: pending
+  TONE-03: pending
+  TONE-04: pending
+  TONE-05: pending
+

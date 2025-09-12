@@ -1,0 +1,41 @@
+}
+
+刁E��観点:
+- domain: 主要な学習�E釁E(creative=チE��イン・音楽・芸衁E academic=学問�E賁E��, fitness=運動・健康を含む)
+- subDomain: より具体的な専門領域
+- learningType: knowledge(知識習征E/skill(スキル向丁E/habit(習�E形戁E/outcome(結果達�E)
+- complexity: beginner/intermediate/advanced
+- timeHorizon: short(1-3朁E/medium(3-6朁E/long(6朁E)
+- keyTerms: 目標に含まれる重要な用語`;
+
+    // 強化版analysisプロンプト�E�ESONフェンスと語彙カタログを前置き！E    const analysisPrompt2 = `次の学習目標を刁E��し、指定�E語彙に正規化したJSONのみめEつの```json```コードフェンス冁E��出力してください。日本語�E丁寧体で、余�Eな説明や見�Eし�E一刁E�E力しなぁE��と、E語彙カタログ�E�忁E��こ�E雁E��から選ぶ/最も近いも�Eに丸める�E�E- domain: ["language","programming","business","creative","academic","fitness","general"]
+- learningType: ["knowledge","skill","habit","outcome"]
+- complexity: ["beginner","intermediate","advanced"]
+- timeHorizon: ["short","medium","long"]
+
+出力形式（例ではなく厳守！E```json
+{
+  "domain": "language|programming|business|creative|academic|fitness|general",
+  "subDomain": "具体的なサブドメイン�E��E由記述、スネ�Eクケース推奨�E�E,
+  "learningType": "knowledge|skill|habit|outcome",
+  "complexity": "beginner|intermediate|advanced",
+  "timeHorizon": "short|medium|long",
+  "keyTerms": ["重要誁E","重要誁E","重要誁E"]
+}
+```
+
+持E��
+- 未知のカチE��リは最も近い語彙にマップすること、E- keyTermsは最大5個、E��褁E��去、半角英数・小文字スネ�Eクケース推奨、E- JSONのみを�E力（フェンス外に何も書かなぁE��。`;
+    try {
+      const response = await advancedQuestService.generateCustom({
+        userGoal: goalText,
+        timeConstraintMinutes: 30,
+        userPreferences: { difficulty: 'medium' },
+        customPrompt: analysisPrompt2
+      });
+
+      // レスポンスからJSONを抽出
+      const jsonMatch = response.match(/\{[\s\S]*?\}/);
+      if (!jsonMatch) {
+        throw new Error('No JSON found in AI response');
+      }

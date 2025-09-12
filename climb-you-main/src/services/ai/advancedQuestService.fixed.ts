@@ -167,11 +167,11 @@ class AdvancedQuestService {
       averageDifficulty: number;
     };
   }> {
-    const startTime = Date.now();
+    const startTime = new Date().getTime();
     
     const result = await this.generateValidatedQuests(args);
     
-    const duration = Date.now() - startTime;
+    const duration = new Date().getTime() - startTime;
     const questCount = result.finalQuests.quests.length;
     const totalMinutes = result.finalQuests.quests.reduce((sum, q) => sum + q.minutes, 0);
     const averageDifficulty = result.finalQuests.quests.reduce((sum, q) => sum + q.difficulty, 0) / questCount;
@@ -263,13 +263,15 @@ class AdvancedQuestService {
       const sessionLength = args.profile.preferred_session_length_min ?? 20;
       const questCount = Math.min(5, Math.max(3, Math.floor(args.profile.time_budget_min_per_day / sessionLength)));
       
-      const questTemplates = [
+      // M1: Expanded quest templates with 10 diverse patterns
+      const allQuestTemplates = [
         {
           title: `${args.profile.long_term_goal || '学習'}の基礎要点メモ`,
           pattern: 'read_note_q' as const,
           baseMinutes: 20,
           difficulty: 0.3,
           deliverable: '学習ノート',
+          skillType: 'concept',
           steps: ['重要な要点を3つ抽出', '理解した内容を簡潔にまとめる'],
           criteria: ['メインポイントを理解し説明できる'],
           tags: ['basic', 'note'],
@@ -279,7 +281,8 @@ class AdvancedQuestService {
           pattern: 'flashcards' as const,
           baseMinutes: 15,
           difficulty: 0.4,
-          deliverable: 'フラッシュカード15果',
+          deliverable: 'フラッシュカード集',
+          skillType: 'concept',
           steps: ['重要用語を選択', '理解しやすい定義を作成'],
           criteria: ['用語と意味を正確に答えられる'],
           tags: ['memory', 'vocabulary'],
@@ -290,23 +293,113 @@ class AdvancedQuestService {
           baseMinutes: 25,
           difficulty: 0.5,
           deliverable: '実践成果物',
+          skillType: 'procedure',
           steps: ['具体的な目標を設定', 'ステップバイステップで実行'],
           criteria: ['成果物が機能し確認できる'],
           tags: ['practice', 'application'],
         },
         {
-          title: `${args.profile.long_term_goal || '学習'}の理解度テスト`,
-          pattern: 'past_paper' as const,
+          title: `${args.profile.long_term_goal || '学習'}設定の確認`,
+          pattern: 'config_verify' as const,
+          baseMinutes: 18,
+          difficulty: 0.3,
+          deliverable: '設定確認レポート',
+          skillType: 'procedure',
+          steps: ['必要な設定項目を確認', 'テスト実行で動作検証'],
+          criteria: ['全設定が正しく機能している'],
+          tags: ['setup', 'verification'],
+        },
+        {
+          title: `${args.profile.long_term_goal || '学習'}の問題解決`,
+          pattern: 'debug_explain' as const,
           baseMinutes: 30,
           difficulty: 0.6,
+          deliverable: '解決策レポート',
+          skillType: 'procedure',
+          steps: ['問題を具体的に特定', '解決方法を試行し結果記録'],
+          criteria: ['問題が解決され説明できる'],
+          tags: ['problem-solving', 'analysis'],
+        },
+        {
+          title: `${args.profile.long_term_goal || '学習'}の概念説明`,
+          pattern: 'feynman' as const,
+          baseMinutes: 20,
+          difficulty: 0.5,
+          deliverable: '簡潔な説明文',
+          skillType: 'concept',
+          steps: ['複雑な概念を簡単な言葉で説明', '例やアナロジーを使用'],
+          criteria: ['初学者に分かりやすく説明できる'],
+          tags: ['explanation', 'understanding'],
+        },
+        {
+          title: `${args.profile.long_term_goal || '学習'}の理解度テスト`,
+          pattern: 'past_paper' as const,
+          baseMinutes: 28,
+          difficulty: 0.6,
           deliverable: '理解度確認シート',
+          skillType: 'concept',
           steps: ['理解した内容を自分でテスト', '弱点を特定し改善点を明確化'],
           criteria: ['理解度が80%以上であることを確認'],
           tags: ['assessment', 'review'],
         },
+        {
+          title: `${args.profile.long_term_goal || '学習'}の質疑応答`,
+          pattern: 'socratic' as const,
+          baseMinutes: 22,
+          difficulty: 0.4,
+          deliverable: '質問回答集',
+          skillType: 'concept',
+          steps: ['重要な質問を自分で作成', '論理的な回答を構築'],
+          criteria: ['深い理解を示す質問と回答ができる'],
+          tags: ['inquiry', 'critical-thinking'],
+        },
+        {
+          title: `${args.profile.long_term_goal || '学習'}の模倣練習`,
+          pattern: 'shadowing' as const,
+          baseMinutes: 24,
+          difficulty: 0.5,
+          deliverable: '練習記録',
+          skillType: 'habit',
+          steps: ['お手本を観察', '同じ動作や手順を繰り返し練習'],
+          criteria: ['お手本通りに実行できる'],
+          tags: ['imitation', 'practice'],
+        },
+        {
+          title: `${args.profile.long_term_goal || '学習'}の振り返り`,
+          pattern: 'retrospective' as const,
+          baseMinutes: 16,
+          difficulty: 0.3,
+          deliverable: '振り返りメモ',
+          skillType: 'habit',
+          steps: ['今日の学習を振り返り', '改善点と次回の目標を設定'],
+          criteria: ['具体的な改善案が設定されている'],
+          tags: ['reflection', 'improvement'],
+        },
       ];
 
-      const selectedQuests = questTemplates
+      // M1: Generate candidates based on SkillAtom types when available
+      const skillBasedCandidates = args.skillAtoms.slice(0, questCount).map(skillAtom => {
+        const suitableTemplates = allQuestTemplates.filter(template => 
+          !template.skillType || template.skillType === skillAtom.type
+        );
+        const template = suitableTemplates[Math.floor(Math.random() * suitableTemplates.length)];
+        
+        return {
+          ...template,
+          title: skillAtom.label || template.title.replace(args.profile.long_term_goal || '学習', skillAtom.label || '学習'),
+        };
+      });
+
+      // M1: Fill remaining slots with random templates if needed
+      const questTemplates = skillBasedCandidates.length >= questCount 
+        ? skillBasedCandidates
+        : [...skillBasedCandidates, ...allQuestTemplates.slice(0, questCount - skillBasedCandidates.length)];
+
+      // M1: Shuffle to ensure variety across runs
+      const shuffledTemplates = [...questTemplates].sort(() => Math.random() - 0.5);
+
+      // M1: Use shuffled templates and apply pattern diversity
+      const selectedQuests = shuffledTemplates
         .slice(0, questCount)
         .map((template, i) => ({
           title: template.title,
@@ -323,7 +416,9 @@ class AdvancedQuestService {
           tags: template.tags,
         }));
 
-      return selectedQuests;
+      // M1: Apply consecutive pattern avoidance
+      const diversifiedQuests = avoidConsecutiveSamePattern(selectedQuests);
+      return diversifiedQuests;
     }
 
     // Real AI implementation
@@ -348,17 +443,20 @@ class AdvancedQuestService {
       const aiQuests = await openaiService.generateQuests(userProfile, questCount);
       
       // Convert AI quests to our Quest format
-      const convertedQuests: Quest[] = aiQuests.map((aiQuest, i) => ({
-        title: aiQuest.title,
-        pattern: this.mapDifficultyToPattern(aiQuest.difficulty),
-        minutes: clampToSession(aiQuest.estimatedTime, args.profile.preferred_session_length_min ?? 20),
-        difficulty: this.mapDifficultyToNumber(aiQuest.difficulty),
-        deliverable: this.extractDeliverable(aiQuest.description),
-        steps: this.extractSteps(aiQuest.description),
-        criteria: [`${aiQuest.title}を成功裏に完了する`],
-        knowledge_check: [],
-        tags: [aiQuest.category.toLowerCase(), aiQuest.difficulty],
-      }));
+      const convertedQuests: Quest[] = aiQuests.map((aiQuest, i) => {
+        const pattern = this.mapDifficultyToPattern(aiQuest.difficulty);
+        return {
+          title: aiQuest.title,
+          pattern,
+          minutes: clampToSession(aiQuest.estimatedTime, args.profile.preferred_session_length_min ?? 20),
+          difficulty: this.mapDifficultyToNumber(aiQuest.difficulty),
+          deliverable: this.extractDeliverable(aiQuest.description, pattern),
+          steps: this.extractSteps(aiQuest.description),
+          criteria: [`${aiQuest.title}を成功裏に完了する`],
+          knowledge_check: [],
+          tags: [aiQuest.category.toLowerCase(), aiQuest.difficulty],
+        };
+      });
 
       console.log(`🤖 Generated ${convertedQuests.length} AI-powered quests`);
       return convertedQuests;
@@ -467,18 +565,42 @@ class AdvancedQuestService {
     return mapping[difficulty];
   }
 
-  private extractDeliverable(description: string): string {
-    // Simple extraction - look for common deliverable keywords
-    const deliverablePatterns = [
-      /ノート/g, /メモ/g, /カード/g, /サンプル/g, /レポート/g,
-      /ファイル/g, /コード/g, /計画/g, /一覧/g
+  private extractDeliverable(description: string, pattern?: string): string {
+    // T-HOTFIX-05: Prefer deliverable from pattern/template, avoid language-specific regex
+    
+    // Pattern-based deliverable mapping (language neutral) - use this first if pattern is available
+    const patternDeliverables = {
+      'read_note_q': 'study notes',
+      'flashcards': 'flashcard set', 
+      'build_micro': 'working project',
+      'config_verify': 'configuration',
+      'debug_explain': 'solution report',
+      'feynman': 'explanation',
+      'past_paper': 'test results',
+      'socratic': 'inquiry notes',
+      'shadowing': 'practice record',
+      'retrospective': 'reflection report'
+    };
+    
+    // Prefer pattern-based deliverable when pattern is known
+    if (pattern && patternDeliverables[pattern]) {
+      return patternDeliverables[pattern];
+    }
+    
+    // Try to extract from common English/neutral terms (avoid Japanese regex)
+    const neutralPatterns = [
+      /\b(notes?|memo|report|file|code|plan|list|record|document)\b/gi,
+      /\b(project|app|program|script|tool)\b/gi,
+      /\b(test|quiz|exercise|practice)\b/gi
     ];
     
-    for (const pattern of deliverablePatterns) {
-      const match = description.match(pattern);
-      if (match) return match[0];
+    for (const patternRegex of neutralPatterns) {
+      const match = description.match(patternRegex);
+      if (match) return match[0].toLowerCase();
     }
-    return '学習成果物';
+    
+    // Fallback to neutral English term instead of Japanese
+    return 'artifact';
   }
 
   private extractSteps(description: string): string[] {
@@ -498,6 +620,110 @@ class AdvancedQuestService {
     temperature?: number;
   }): Promise<string> {
     if (!this.useRealAI) {
+      // Pre-Goal Analysis用のMock JSONレスポンスを生成
+      if (args.customPrompt.includes('Pre-Goal Analysis') || args.customPrompt.includes('pre-goal')) {
+        return JSON.stringify({
+          "classification": {
+            "domain": "general",
+            "complexity": "intermediate", 
+            "learning_type": "skill",
+            "subdomain": "general_learning"
+          },
+          "normalized_goal": args.userGoal,
+          "outcome_metric": {
+            "name": "Goal Achievement",
+            "target": "目標達成",
+            "unit": null,
+            "baseline": null,
+            "deadline": null
+          },
+          "prerequisites": [{
+            "skill": "基礎知識",
+            "rationale": "学習の基盤となる知識"
+          }],
+          "first_day_seed": {
+            "quests": [
+              {
+                "title": `${args.userGoal}の基礎学習`,
+                "pattern": "read_note_q",
+                "minutes": 30,
+                "difficulty": 0.4,
+                "deliverable": "学習ノート"
+              },
+              {
+                "title": `${args.userGoal}の実践`,
+                "pattern": "build_micro", 
+                "minutes": 25,
+                "difficulty": 0.5,
+                "deliverable": "実践成果"
+              }
+            ],
+            "total_minutes_max": 90
+          },
+          "risk_triage": {
+            "overload": false,
+            "dependency": false,
+            "uncertainty": true,
+            "notes": ["Mock分析のため詳細なリスク評価は限定的"]
+          },
+          "question_hints": [{
+            "category": "success_metrics",
+            "priority": 0.7,
+            "rationale": "目標達成の指標を明確化"
+          }],
+          "backcast": {
+            "outcome": {"description": `${args.userGoal}を達成した状態`},
+            "intermediate": ["基礎知識習得", "実践経験積み重ね"],
+            "behavior": ["継続的な学習", "定期的な実践"]
+          },
+          "rubric_scores": {
+            "relevance": 0.7,
+            "feasibility": 0.8,
+            "specificity": 0.6,
+            "load_fit": 1.0
+          },
+          "confidence": {
+            "classification": 0.6,
+            "outcome_metric": 0.5,
+            "backcast": 0.5
+          }
+        }, null, 2);
+      }
+      
+      // Milestone生成用のMock JSONレスポンス
+      if (args.customPrompt.includes('milestone') || args.customPrompt.includes('マイルストーン')) {
+        return JSON.stringify({
+          "Now": [{
+            "id": "now_1",
+            "title": `${args.userGoal}の基礎理解`,
+            "description": "基本的な知識と技能を身につける",
+            "due_date": "2025-10-12",
+            "KPI": {"name": "基礎理解度", "target": "80%", "unit": "%"},
+            "risk_flags": ["uncertainty"],
+            "feasibility": {"score": 0.8, "factors": ["時間確保", "学習リソース"]}
+          }],
+          "Next": [{
+            "id": "next_1", 
+            "title": `${args.userGoal}の実践応用`,
+            "description": "実際の場面で応用できるレベルに到達",
+            "due_date": "2025-11-12",
+            "KPI": {"name": "実践スキル", "target": "70%", "unit": "%"},
+            "risk_flags": ["dependency"],
+            "feasibility": {"score": 0.7, "factors": ["継続的練習"]}
+          }],
+          "Later": [{
+            "id": "later_1",
+            "title": `${args.userGoal}の完全習得`,
+            "description": "上級レベルでの独立した実行が可能",
+            "due_date": "2025-12-12", 
+            "KPI": {"name": "総合スキル", "target": "90%", "unit": "%"},
+            "risk_flags": ["overload"],
+            "feasibility": {"score": 0.6, "factors": ["長期継続"]}
+          }]
+        }, null, 2);
+      }
+      
+      // 通常のカスタムクエスト生成
       return `カスタムクエスト: ${args.userGoal}に関する${args.timeConstraintMinutes || 20}分のタスクを実行してください。`;
     }
 

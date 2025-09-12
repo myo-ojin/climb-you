@@ -1,0 +1,434 @@
+metadata:
+  title: Internationalization (i18n) Rollout Plan
+  version: 0.1.0
+  created: 2025-09-12
+  owners: ["mobile-core", "ai-core", "design-ux"]
+  status: draft
+
+principles:
+  - "MVP: English only (en)"
+  - "Staged rollout of major languages; explicit exclusion of Chinese locales"
+  - "Single source of truth for keys; no hardcoded UI strings"
+  - "Prompt localization uses curated locale packs; JSON contract is language-agnostic"
+  - "Graceful fallback: user-visible UI -> en; prompts -> en"
+  - "Declare supportedLocales at OS level; in-app selector overrides OS app-language"
+  - "Use BCP 47-compliant locale tags everywhere (e.g., pt-BR)"
+
+exclusions:
+  locales_excluded: ["zh", "zh-CN", "zh-HK", "zh-TW"]
+
+supported_locales:
+  - code: en
+    name: English
+    phase: MVP
+  - code: ja
+    name: Japanese
+    phase: 1
+  - code: es
+    name: Spanish
+    phase: 1
+  - code: fr
+    name: French
+    phase: 2
+  - code: de
+    name: German
+    phase: 2
+  - code: ko
+    name: Korean
+    phase: 2
+  - code: pt-BR
+    name: Portuguese (Brazil)
+    phase: 2
+  - code: it
+    name: Italian
+    phase: 3
+  - code: tr
+    name: Turkish
+    phase: 3
+  - code: vi
+    name: Vietnamese
+    phase: 3
+  - code: th
+    name: Thai
+    phase: 3
+  - code: ru
+    name: Russian
+    phase: 3
+  - code: ar
+    name: Arabic (RTL)
+    phase: 4
+  - code: hi
+    name: Hindi
+    phase: 4
+  - code: id
+    name: Indonesian
+    phase: 4
+
+architecture:
+  libraries:
+    ui:
+      - i18next
+      - react-i18next
+      - expo-localization
+      - i18next-resources-to-backend
+      - i18next-icu  # pluralization, gender, formatting
+    rn_rtl: I18nManager  # for RTL locales like ar
+    intl:
+      primary: Hermes Intl (RN>=0.71)
+      fallback_polyfills: ['@formatjs/intl-numberformat', '@formatjs/intl-datetimeformat']
+  resources:
+    ui_strings_dir: assets/i18n
+    prompt_packs_dir: src/services/ai/promptPacks
+    key_style: screen.section.component.key  # example: onboarding.goal.input.placeholder
+  state:
+    detection: expo-localization (device preferred locales)
+    persistence: AsyncStorage key 'app_locale'
+    remote_profile_field: user_profile.preferred_language
+  fallback:
+    ui: en
+    prompts: en
+  testing:
+    pseudo_locale: en-PS  # ⟦Ⱥccented⟧ pseudo strings for overflow tests
+    e2e_locales: [en, ja, es, ar]
+  os_app_language:
+    supportedLocales_config: true  # app.json via expo-localization plugin
+    precedence: [app_locale, os_app_language, device_language, 'en']
+
+prompts_localization:
+  strategy:
+    - "Define PromptLocalePacks per locale (en/ja/es/...); avoid naive MT for system prompts"
+    - "Keep JSON output schema identical across locales"
+    - "Add `lang` and `return JSON only` guardrails in each locale pack"
+  files:
+    base_keys:
+      - pre_goal_analysis.system
+      - profile_question_engine.system
+      - milestone_engine.system
+      - one_day_quest_builder.system
+    dir_structure:
+      - src/services/ai/promptPacks/en/*.md
+      - src/services/ai/promptPacks/ja/*.md
+      - src/services/ai/promptPacks/es/*.md
+  fallback_policy:
+    - "If locale pack missing -> use en"
+    - "If partial -> merge(en, locale)"
+
+deliverables:
+  ui_strings:
+    - assets/i18n/en.json
+    - assets/i18n/ja.json
+    - assets/i18n/es.json
+  prompt_locale_packs:
+    - src/services/ai/promptPacks/en/*.md
+    - src/services/ai/promptPacks/ja/*.md
+    - src/services/ai/promptPacks/es/*.md
+  infra:
+    - src/services/i18n/i18n.ts  # i18next init
+    - src/services/i18n/locale.ts  # detection + persistence helpers
+    - src/hooks/useLocale.ts  # locale switch hook
+    - src/screens/settings/LanguageSettingsScreen.tsx  # dedicated language selection screen
+    - src/components/LocaleOptionRow.tsx  # reusable option row with preview
+    - navigation route entry from Profile -> Language
+    - src/screens/onboarding/LanguagePickerScreen.tsx  # first-run language picker (before goal onboarding)
+    - onboarding gating logic to present LanguagePicker on first app launch
+    - app.json: expo-localization plugin + supportedLocales (iOS/Android)
+    - app.json: locales for app name/metadata
+
+rollout:
+  phases:
+    - id: 0
+      name: foundation_mvp_en
+      scope: [ui_i18n_infra, en_pack, locale_switch, fallback, pseudo_locale]
+      exit_criteria:
+        - "No hardcoded UI strings; 100% key coverage"
+        - "MVP flows pass with en"
+        - "pseudolocalization shows no clipping in top 10 screens"
+    - id: 1
+      name: add_ja_es
+      scope: [ja_pack, es_pack, prompt_packs_ja_es, lint_keys, ci_check]
+      exit_criteria:
+        - "ja/es UI coverage >= 95%"
+        - "prompt packs ready for ja/es"
+        - "runtime locale switch persists across restart"
+    - id: 2
+      name: add_fr_de_ko_ptbr
+      scope: [fr_pack, de_pack, ko_pack, ptbr_pack, fonts_check_asian]
+      exit_criteria:
+        - "pluralization rules validated via ICU in all 4 locales"
+        - "font fallback verified for ko/ja"
+    - id: 3
+      name: add_it_tr_vi_th_ru
+      scope: [it_pack, tr_pack, vi_pack, th_pack, ru_pack]
+      exit_criteria:
+        - "LTR layouts OK; long strings fit in key screens"
+    - id: 4
+      name: add_ar_hi_id (rtl_and_complex)
+      scope: [ar_pack, hi_pack, id_pack, rtl_enable, icon_mirroring]
+      exit_criteria:
+        - "RTL flip verified; inputs and tabs align"
+        - "number/date formats follow locale conventions"
+
+tasks:
+  - id: T-001
+    phase: 0
+    name: Add i18n infrastructure (i18next + expo-localization + ICU)
+    files: [src/services/i18n/i18n.ts, src/services/i18n/locale.ts]
+    owners: [mobile-core]
+    estimate_days: 0.5
+    steps:
+      - install_deps: ["i18next", "react-i18next", "i18next-icu", "i18next-resources-to-backend", "expo-localization"]
+      - init_i18next_with_ICU_and_backend
+      - hook_provider_in_App.tsx
+      - locale_detection_and_persistence
+      - add_icu_message_lint_and_type_check_rules
+  - id: T-002
+    phase: 0
+    name: Extract UI strings to en.json
+    files: [assets/i18n/en.json]
+    owners: [design-ux, mobile-core]
+    estimate_days: 1.0
+    steps:
+      - scan_src_for_literals
+      - define_key_style
+      - replace_literals_with_t_function
+  - id: T-003
+    phase: 0
+    name: Wire navigation entry to Language screen
+    files: [src/screens/ProfileScreen.tsx, src/navigation/AppNavigator.tsx]
+    owners: [mobile-core]
+    estimate_days: 0.5
+    steps:
+      - add_menu_item_in_Profile_to_open_LanguageSettings
+      - register_stack_or_modal_route_for_LanguageSettings
+      - optional_sync_to_firebase_profile
+  - id: T-004
+    phase: 0
+    name: Pseudolocalization test
+    owners: [qa]
+    estimate_days: 0.5
+    steps:
+      - generate_en-PS_from_en_json
+      - run_top_flows_and_fix_layout_overflows
+  - id: T-005
+    phase: 0
+    name: Build Language Settings Screen (dedicated)
+    files: [src/screens/settings/LanguageSettingsScreen.tsx, src/components/LocaleOptionRow.tsx]
+    owners: [mobile-core, design-ux]
+    estimate_days: 1.0
+    steps:
+      - list_supported_locales_excluding_zh
+      - show_native_names (e.g., English, 日本語, Español)
+      - indicate_RTL_support_on_locale (badge for ar)
+      - tap_to_select_with_checkmark; apply_immediately_via_i18next.changeLanguage
+      - persist_in_AsyncStorage ('app_locale') and update user_profile.preferred_language (if logged in)
+      - include_preview_sample_block (title, sentence, date/number format preview)
+      - add_search_filter (optional if list > 8)
+      - analytics_event 'locale_change' with {from,to}
+  - id: T-006
+    phase: 0
+    name: Add first-run Language Picker to onboarding
+    files: [src/screens/onboarding/LanguagePickerScreen.tsx, src/navigation/OnboardingNavigator.tsx]
+    owners: [mobile-core, design-ux]
+    estimate_days: 1.0
+    steps:
+      - create_onboarding_language_picker_screen (native names, checkmark)
+      - offer_options: [Use device language (if supported), English, other supported locales]
+      - exclude_zh_locales_from_list; if device locale is excluded, default suggestion = English
+      - persist_choice_to_AsyncStorage('app_locale') immediately on tap
+      - set_i18next_language_and_re-render_UI
+      - navigate_to_next_onboarding_step (GoalDeepDive) after selection
+      - log_analytics 'first_run_locale_selected'
+  - id: T-007
+    phase: 0
+    name: App boot gating to show LanguagePicker if no saved locale
+    files: [App.tsx, src/services/i18n/locale.ts]
+    owners: [mobile-core]
+    estimate_days: 0.5
+    steps:
+      - check_AsyncStorage('app_locale') at startup
+      - if_missing -> set initial route of OnboardingNavigator to LanguagePicker
+      - else -> proceed with existing onboarding flow
+      - ensure_fallback_to_en_when_invalid_or_excluded
+  - id: T-008
+    phase: 0
+    name: Configure OS supportedLocales & app metadata localization
+    files: [app.json]
+    owners: [mobile-core]
+    estimate_days: 0.5
+    steps:
+      - add_expo-localization_plugin
+      - declare_supportedLocales_ios_android: ["en","ja","es","fr","de","ko","pt-BR","it","tr","vi","th","ru","ar","hi","id"]
+      - add_locales_section_for_app_name_and_strings
+      - verify_OS_app_language_switch_behavior
+  - id: T-009
+    phase: 0
+    name: Intl availability check and polyfill fallback
+    files: [src/services/i18n/i18n.ts]
+    owners: [mobile-core]
+    estimate_days: 0.5
+    steps:
+      - detect_Intl_support_at_runtime
+      - load_formatjs_polyfills_if_missing
+      - verify_ICU_plural_and_date_number_formatting
+  - id: T-010
+    phase: 0
+    name: RTL audit checklist and fixes
+    files: [docs/rtl_checklist.md]
+    owners: [mobile-core]
+    estimate_days: 0.5
+    steps:
+      - enumerate_directional_assets_and_layouts
+      - test_with_I18nManager.isRTL true (dev-only)
+      - document_icon_mirroring_and_layout_pitfalls
+  - id: T-011
+    phase: 0
+    name: Pseudolocalization QA procedure (Android/iOS)
+    files: [docs/i18n_pseudoqa.md]
+    owners: [qa]
+    estimate_days: 0.5
+    steps:
+      - android_enable_en-XA_ar-XB
+      - ios_enable_pseudolanguage_double_length_and_rtl
+      - capture_screenshots_top_flows_and_fix_overflows
+  - id: T-012
+    phase: 1
+    name: BCP47 locale tag validator and CI checks
+    files: [scripts/i18n/validate_locales.js]
+    owners: [mobile-core]
+    estimate_days: 0.5
+    steps:
+      - validate_all_locale_codes_against_bcp47
+      - fail_ci_on_invalid_or_duplicate_locales
+  - id: T-101
+    phase: 1
+    name: Add ja/es UI packs
+    owners: [design-ux]
+    estimate_days: 1.5
+    steps:
+      - create_assets/i18n/ja.json
+      - create_assets/i18n/es.json
+      - coverage_lint
+  - id: T-102
+    phase: 1
+    name: Add ja/es PromptLocalePacks
+    owners: [ai-core]
+    estimate_days: 1.5
+    steps:
+      - author_promptPacks/ja/*.md  # curated, not MT
+      - author_promptPacks/es/*.md
+      - ensure_json_contract_and_guardrails
+  - id: T-201
+    phase: 2
+    name: FR/DE/KO/PT-BR UI + plural rules via ICU
+    owners: [mobile-core]
+    estimate_days: 2.0
+  - id: T-202
+    phase: 2
+    name: Font fallback verification (Noto subsets)
+    owners: [mobile-core]
+    estimate_days: 0.5
+    steps:
+      - add_expo-font_if_needed
+      - verify_ko_ja_glyphs
+  - id: T-301
+    phase: 3
+    name: IT/TR/VI/TH/RU UI packs
+    owners: [design-ux]
+    estimate_days: 2.5
+  - id: T-401
+    phase: 4
+    name: RTL enablement for Arabic
+    owners: [mobile-core]
+    estimate_days: 1.0
+    steps:
+      - enable_I18nManager_allowRTL
+      - test_icon_mirroring
+      - validate_textinput_alignment
+  - id: T-402
+    phase: 4
+    name: HI/ID UI packs
+    owners: [design-ux]
+    estimate_days: 1.0
+
+ai_specific_tasks:
+  - id: A-001
+    phase: 0
+    name: Enforce JSON-only outputs across locales
+    owners: [ai-core]
+    estimate_days: 0.25
+  - id: A-101
+    phase: 1
+    name: Locale-aware scoring for question_hints
+    owners: [ai-core]
+    estimate_days: 0.5
+    details: "tune info_gain per locale if needed"
+  - id: A-201
+    phase: 2
+    name: Add locale parameter to all prompt builders
+    owners: [ai-core]
+    estimate_days: 0.5
+
+ci_and_tooling:
+  checks:
+    - key_coverage_check: "no missing keys compared to en.json"
+    - unused_key_check: true
+    - ICU_message_validation: true
+    - bcp47_locale_validation: true
+    - rtl_visual_regression: optional
+  scripts:
+    - yarn i18n:lint
+    - yarn i18n:gen-pseudo
+    - yarn i18n:validate-locales
+
+acceptance_criteria:
+  phase_0:
+    - "App runs fully in English; 0 hardcoded literals"
+    - ">= 95% of visible screens covered by en.json"
+    - "Language Settings screen accessible from Profile; selection applies immediately and persists across restart"
+    - "On first app launch, user sees Language Picker before onboarding; selection persists and updates UI immediately"
+    - "OS app-language switch works for declared supportedLocales; in-app choice overrides it"
+  phase_1:
+    - "ja/es selectable; persists after restart"
+    - "Prompt packs for ja/es validated (JSON-only)"
+  phase_4:
+    - "RTL Arabic layout passes manual QA in top 10 screens"
+
+risks:
+  - name: Long strings overflow
+    mitigation: "pseudolocalization; allow multiline; set flex shrink"
+  - name: RTL regressions
+    mitigation: "I18nManager tests; mirrored icons"
+  - name: Prompt drift across locales
+    mitigation: "curated locale packs; fallback to en; JSON schema validation"
+  - name: Font glyph missing (CJK/KO/Arabic)
+    mitigation: "Noto subset fonts via expo-font"
+  - name: OS app-language vs in-app setting mismatch
+    mitigation: "clear precedence (app > OS app-language > device > en) and document behavior"
+
+ops:
+  release_cadence: "pair two languages per minor release after MVP"
+  monitoring: "capture locale in analytics events to watch crash/UX issues"
+
+status:
+  T-001: pending
+  T-002: pending
+  T-003: pending
+  T-004: pending
+  T-005: pending
+  T-006: pending
+  T-007: pending
+  T-008: pending
+  T-009: pending
+  T-010: pending
+  T-011: pending
+  T-012: pending
+  T-101: pending
+  T-102: pending
+  T-201: pending
+  T-202: pending
+  T-301: pending
+  T-401: pending
+  T-402: pending
+  A-001: pending
+  A-101: pending
+  A-201: pending

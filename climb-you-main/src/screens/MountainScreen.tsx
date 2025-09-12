@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import MountainAnimation from '../components/MountainAnimation';
+import EnhancedMountainAnimation from '../components/EnhancedMountainAnimation';
 
 export default function MountainScreen() {
   const [progress, setProgress] = useState(45);
@@ -33,7 +33,7 @@ export default function MountainScreen() {
       </View>
 
       <View style={styles.mountainContainer}>
-        <MountainAnimation progress={progress} />
+        <EnhancedMountainAnimation progress={progress} />
       </View>
 
       <View style={styles.statsContainer}>

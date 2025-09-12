@@ -1,0 +1,75 @@
+export function buildPolicyCheckPrompt(args: {
+  questsCandidate: Quest[];
+  constraints: Constraints;
+}): string {
+  const { questsCandidate, constraints } = args;
+  return `谺｡縺ｮ quests[] 繧貞ｯｩ譟ｻ縺励∝宛邏・＆蜿阪・驥崎､・・繝｢繝ｼ繝牙￥繧翫ｒ讀懷・縺励※菫ｮ豁｣譯医ｒ蜃ｺ縺励∵怙邨ら沿繧・JSON 縺ｧ霑斐＠縺ｦ縺上□縺輔＞縲・菫ｮ豁｣譎ゅ・蜈・・逶ｮ逧・ｒ菫昴■縺､縺､ pattern/minutes 繧貞ｾｮ隱ｿ謨ｴ縺励※縺上□縺輔＞縲・
+蜈･蜉・
+<QUESTS_CANDIDATE>${JSON.stringify({ quests: questsCandidate })}</QUESTS_CANDIDATE>
+<CONSTRAINTS>${JSON.stringify(constraints)}</CONSTRAINTS>
+
+蜃ｺ蜉帙ヵ繧ｩ繝ｼ繝槭ャ繝・
+{
+  "quests": [ /* 3窶・莉ｶ */ ],
+  "rationale": ["菫ｮ豁｣逅・罰繧堤ｮ・擅譖ｸ縺・]
+}`;
+}
+
+// -----------------------------
+// 5) 險ｭ險域嶌縺ｮ繝倥Ν繝代・髢｢謨ｰ繧貞ｮ悟・遘ｻ讀・// -----------------------------
+
+export function difficultyHintFromMotivation(m: "low"|"mid"|"high"): number {
+  return m === "low" ? 0.35 : m === "high" ? 0.65 : 0.5;
+}
+
+export function heatMultiplier(heatLevel: number): number {
+  return { 1: 0.6, 2: 0.8, 3: 1.0, 4: 1.2, 5: 1.4 }[heatLevel as 1 | 2 | 3 | 4 | 5] ?? 1.0;
+}
+
+export function buildDerived(profile: ProfileV1): Derived {
+  const daily = Math.floor(profile.time_budget_min_per_day * 0.8 * heatMultiplier(profile.heat_level ?? 3));
+  const session = Math.max(10, Math.min(60, profile.preferred_session_length_min ?? 20));
+  const countHint = Math.max(3, Math.min(6, Math.round(daily / session)));
+  const novelty = profile.novelty_preference ?? 0.5;
+  const difficulty_hint = difficultyHintFromMotivation(profile.goal_motivation ?? "mid");
+  return { daily_capacity_min: daily, quest_count_hint: countHint, novelty_ratio: novelty, difficulty_rating: 1200, difficulty_hint };
+}
+
+export function buildConstraints(profile: ProfileV1, derived: Derived, checkins: DailyCheckins): Constraints {
+  return ConstraintsSchema.parse({
+    total_minutes_max: Math.max(10, derived.daily_capacity_min + (checkins.available_time_today_delta_min ?? 0)),
+    preferred_session_length_min: profile.preferred_session_length_min ?? 20,
+    novelty_ratio: derived.novelty_ratio,
+    env_constraints: profile.env_constraints,
+    avoid_consecutive_same_pattern: true,
+  });
+}
+
+// -----------------------------
+// 6) 蠕悟・逅・・繝ｫ繝代・・郁ｨｭ險域嶌螳悟・遘ｻ讀搾ｼ・// -----------------------------
+
+export function clampToSession(minutes: number, session: number): number {
+  const diff = minutes - session;
+  if (Math.abs(diff) <= 5) return session; // snap
+  return Math.max(10, Math.min(90, minutes));
+}
+
+export function avoidConsecutiveSamePattern(quests: Quest[]): Quest[] {
+  const out: Quest[] = [];
+  let last: Pattern | null = null;
+  for (const q of quests) {
+    if (last && q.pattern === last) {
+      // try to swap with previous if possible
+      const idx = out.findIndex((p) => p.pattern !== last);
+      if (idx >= 0) {
+        out.splice(idx, 0, q);
+      } else {
+        out.push(q); // give up, leave as-is
+      }
+    } else {
+      out.push(q);
+      last = q.pattern;
+    }
+  }
+  return out;
+}

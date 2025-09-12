@@ -158,6 +158,11 @@ export const QuestSchema = z.object({
     .array(z.object({ q: z.string(), a: z.string() }))
     .default([]),
   tags: z.array(z.string()).min(1),
+  // Phase 0 additions for one-day completion guarantees
+  done_definition: z.string().min(4).optional(),
+  evidence: z.array(z.string()).max(3).default([]),
+  alt_plan: z.string().min(4).optional(),
+  stop_rule: z.string().min(4).optional(),
 });
 export type Quest = z.infer<typeof QuestSchema>;
 

@@ -1,0 +1,174 @@
+/**
+ * Adaptive Question Service - 逶ｮ讓吶↓蠢懊§縺溷虚逧・ｳｪ蝠冗函謌舌す繧ｹ繝・Β
+ * 
+ * 笞・・DEPRECATED: 譁ｰ縺励＞繝上う繝悶Μ繝・ラ繧ｷ繧ｹ繝・Β縺ｫ遘ｻ陦梧ｸ医∩
+ * 隧ｳ邏ｰ縺ｯ hybridQuestionService.ts 繧貞盾辣ｧ
+ */
+
+import { z } from 'zod';
+import { advancedQuestService } from './advancedQuestService';
+import { Question, ProfileAnswers } from '../../types/onboardingQuestions';
+import { goalClarificationService, GoalClarificationNeeded } from './goalClarificationService';
+
+// 逶ｮ讓呵ｧ｣譫千ｵ先棡縺ｮ蝙句ｮ夂ｾｩ
+export interface GoalAnalysis {
+  domain: 'language' | 'programming' | 'business' | 'creative' | 'academic' | 'fitness' | 'general';
+  subDomain: string; // 萓・ 'english_speaking', 'react_development', 'sales_skills'
+  learningType: 'knowledge' | 'skill' | 'habit' | 'outcome';
+  complexity: 'beginner' | 'intermediate' | 'advanced';
+  timeHorizon: 'short' | 'medium' | 'long'; // 1-3譛・ 3-6譛・ 6譛・
+  keyTerms: string[]; // 驥崎ｦ√↑繧ｭ繝ｼ繝ｯ繝ｼ繝・}
+
+// 蜍慕噪雉ｪ蝠冗函謌舌・繧ｹ繧ｭ繝ｼ繝・export const AdaptiveQuestionSchema = z.object({
+  id: z.string(),
+  blockId: z.enum(['A', 'B', 'C', 'D']),
+  stepInBlock: z.enum([1, 2, 3]),
+  question: z.string().min(10),
+  options: z.array(z.object({
+    id: z.string(),
+    label: z.string().min(5),
+    value: z.union([z.string(), z.number()]),
+    dataKey: z.string()
+  })).min(3).max(6),
+  hasOptionalMemo: z.boolean().default(true),
+  parentDependency: z.string().optional(),
+  goalContext: z.string().optional() // 逶ｮ讓吶さ繝ｳ繝・く繧ｹ繝医・隱ｬ譏・});
+
+export type AdaptiveQuestion = z.infer<typeof AdaptiveQuestionSchema>;
+
+// 繝悶Ο繝・け蛻･雉ｪ蝠上そ繝・ヨ
+export interface QuestionBlock {
+  blockId: 'A' | 'B' | 'C' | 'D';
+  blockTitle: string;
+  blockDescription: string;
+  questions: AdaptiveQuestion[];
+}
+
+class AdaptiveQuestionService {
+  /**
+   * 逶ｮ讓吶ユ繧ｭ繧ｹ繝医ｒ隗｣譫舌＠縺ｦ蟄ｦ鄙偵ラ繝｡繧､繝ｳ縺ｨ迚ｹ諤ｧ繧堤音螳・   * 譖匁乂縺ｪ逶ｮ讓吶・蝣ｴ蜷医・GoalClarificationNeeded繧稚hrow縺吶ｋ
+   */
+  async analyzeGoal(goalText: string): Promise<GoalAnalysis> {
+    // Phase 1: 譖匁乂諤ｧ繝√ぉ繝・け・域眠讖溯・・・    await goalClarificationService.validateGoalOrThrow(goalText);
+    
+    if (!advancedQuestService.isInitialized()) {
+      throw new Error('AdvancedQuestService not initialized');
+    }
+
+    // AI API繧剃ｽｿ縺｣縺ｦ逶ｮ讓吶ｒ蛻・梵
+    const analysisPrompt = `莉･荳九・蟄ｦ鄙堤岼讓吶ｒ蛻・梵縺励※縲゛SON蠖｢蠑上〒霑斐＠縺ｦ縺上□縺輔＞縲・
+逶ｮ讓・ "${goalText}"
+
+莉･荳九・蠖｢蠑上〒蝗樒ｭ斐＠縺ｦ縺上□縺輔＞:
+{
+  "domain": "language|programming|business|creative|academic|fitness|general",
+  "subDomain": "蜈ｷ菴鍋噪縺ｪ繧ｵ繝悶ラ繝｡繧､繝ｳ・井ｾ・ english_speaking, react_development・・,
+  "learningType": "knowledge|skill|habit|outcome",
+  "complexity": "beginner|intermediate|advanced", 
+  "timeHorizon": "short|medium|long",
+  "keyTerms": ["驥崎ｦ√↑繧ｭ繝ｼ繝ｯ繝ｼ繝・", "繧ｭ繝ｼ繝ｯ繝ｼ繝・"]
+}
+
+蛻・梵隕ｳ轤ｹ:
+- domain: 荳ｻ隕√↑蟄ｦ鄙貞・驥・- subDomain: 繧医ｊ蜈ｷ菴鍋噪縺ｪ蟆る摩鬆伜沺
+- learningType: 遏･隴倡ｿ貞ｾ・繧ｹ繧ｭ繝ｫ蜷台ｸ・鄙呈・蠖｢謌・邨先棡驕疲・縺ｮ縺ｩ繧後′荳ｻ逶ｮ逧・°
+- complexity: 逶ｮ讓吶・髮｣譏灘ｺｦ繝ｬ繝吶Ν
+- timeHorizon: 驕疲・縺ｾ縺ｧ縺ｮ譛滄俣・育洒譛・-3譛・荳ｭ譛・-6譛・髟ｷ譛・譛・・・- keyTerms: 逶ｮ讓吶↓蜷ｫ縺ｾ繧後ｋ驥崎ｦ√↑逕ｨ隱杼;
+
+    try {
+      // 螳滄圀縺ｮAI API蜻ｼ縺ｳ蜃ｺ縺励・莉｣繧上ｊ縺ｫ縲√∪縺壹・蝓ｺ譛ｬ逧・↑隗｣譫舌ｒ螳溯｣・      const analysis = this.basicGoalAnalysis(goalText);
+      console.log('剥 Goal Analysis Result:', analysis);
+      return analysis;
+    } catch (error) {
+      console.error('Goal analysis failed:', error);
+      // 繝輔か繝ｼ繝ｫ繝舌ャ繧ｯ: 蝓ｺ譛ｬ逧・↑隗｣譫・      return this.basicGoalAnalysis(goalText);
+    }
+  }
+
+  /**
+   * 蝓ｺ譛ｬ逧・↑逶ｮ讓呵ｧ｣譫撰ｼ・I API螟ｱ謨玲凾縺ｮ繝輔か繝ｼ繝ｫ繝舌ャ繧ｯ・・   */
+  private basicGoalAnalysis(goalText: string): GoalAnalysis {
+    const text = goalText.toLowerCase();
+    
+    // 繝峨Γ繧､繝ｳ蛻､螳・    let domain: GoalAnalysis['domain'] = 'general';
+    let subDomain = 'general_learning';
+    
+    if (text.includes('闍ｱ隱・) || text.includes('english') || text.includes('隧ｱ縺帙ｋ') || text.includes('莨夊ｩｱ')) {
+      domain = 'language';
+      subDomain = 'english_speaking';
+    } else if (text.includes('繝励Ο繧ｰ繝ｩ繝溘Φ繧ｰ') || text.includes('react') || text.includes('髢狗匱') || text.includes('繧ｳ繝ｼ繝・)) {
+      domain = 'programming';
+      subDomain = text.includes('react') ? 'react_development' : 'general_programming';
+    } else if (text.includes('蝟ｶ讌ｭ') || text.includes('雋ｩ螢ｲ') || text.includes('繝薙ず繝阪せ')) {
+      domain = 'business';
+      subDomain = 'sales_skills';
+    } else if (text.includes('繝・じ繧､繝ｳ') || text.includes('髻ｳ讌ｽ') || text.includes('闃ｸ陦・)) {
+      domain = 'creative';
+      subDomain = 'creative_skills';
+    } else if (text.includes('雉・ｼ') || text.includes('隧ｦ鬨・) || text.includes('蜍牙ｼｷ')) {
+      domain = 'academic';
+      subDomain = 'certification';
+    } else if (text.includes('遲九ヨ繝ｬ') || text.includes('繝繧､繧ｨ繝・ヨ') || text.includes('驕句虚')) {
+      domain = 'fitness';
+      subDomain = 'fitness_training';
+    }
+
+    // 蟄ｦ鄙偵ち繧､繝怜愛螳・    let learningType: GoalAnalysis['learningType'] = 'skill';
+    if (text.includes('遏･繧・) || text.includes('逅・ｧ｣') || text.includes('蟄ｦ縺ｶ')) {
+      learningType = 'knowledge';
+    } else if (text.includes('鄙呈・') || text.includes('邯壹￠繧・) || text.includes('豈取律')) {
+      learningType = 'habit';
+    } else if (text.includes('蜷域ｼ') || text.includes('隧ｦ鬨・) || text.includes('驕疲・')) {
+      learningType = 'outcome';
+    }
+
+    // 隍・尅縺募愛螳・    let complexity: GoalAnalysis['complexity'] = 'intermediate';
+    if (text.includes('蝓ｺ遉・) || text.includes('蛻晏ｿ・・) || text.includes('蟋九ａ繧・)) {
+      complexity = 'beginner';
+    } else if (text.includes('荳顔ｴ・) || text.includes('蟆る摩') || text.includes('繝槭せ繧ｿ繝ｼ')) {
+      complexity = 'advanced';
+    }
+
+    // 繧ｭ繝ｼ繝ｯ繝ｼ繝画歓蜃ｺ
+    const keyTerms = goalText.split(/\s|縲－・・).filter(term => term.length > 1);
+
+    return {
+      domain,
+      subDomain,
+      learningType,
+      complexity,
+      timeHorizon: 'medium',
+      keyTerms: keyTerms.slice(0, 5) // 譛蛻昴・5縺､縺ｮ繧ｭ繝ｼ繝ｯ繝ｼ繝・    };
+  }
+
+  /**
+   * 4ﾃ・讒矩縺ｮ螳悟・縺ｪ雉ｪ蝠上そ繝・ヨ繧堤函謌・   * 笞・・DEPRECATED: hybridQuestionService.generateHybridQuestionSet() 繧剃ｽｿ逕ｨ縺励※縺上□縺輔＞
+   */
+  async generateAdaptiveQuestionSet(goalText: string): Promise<QuestionBlock[]> {
+    console.warn('笞・・generateAdaptiveQuestionSet is deprecated. Use hybridQuestionService.generateHybridQuestionSet() instead.');
+    
+    // 繝上う繝悶Μ繝・ラ繧ｵ繝ｼ繝薙せ縺ｫ繝ｪ繝繧､繝ｬ繧ｯ繝・    const { hybridQuestionService } = await import('./hybridQuestionService');
+    const result = await hybridQuestionService.generateHybridQuestionSet(goalText);
+    return result.blocks;
+  }
+
+  // =============================
+  // 投 繝ｪ繝輔ぃ繧ｯ繧ｿ繝ｪ繝ｳ繧ｰ螳御ｺ・ｵｱ險・  // =============================
+  
+  /**
+   * 繝ｪ繝輔ぃ繧ｯ繧ｿ繝ｪ繝ｳ繧ｰ蜉ｹ譫・
+   * 
+   * 棟 繧ｳ繝ｼ繝峨し繧､繧ｺ: 946陦・竊・186陦・(80%蜑頑ｸ・
+   * 笞｡ API蜉ｹ邇・ 4蝗・竊・2蝗・(50%蜑頑ｸ・
+   * 識 譁ｰ蛻・㍽蟇ｾ蠢・ 3蛻・㍽ 竊・辟｡蛻ｶ髯・   * 肌 繝｡繝ｳ繝・リ繝ｳ繧ｹ: 隍・尅 竊・繧ｷ繝ｳ繝励Ν
+   * 
+   * 遘ｻ陦悟・:
+   * - 逶ｮ讓呎・遒ｺ諤ｧ讀懷・: goalClarificationService.ts
+   * - 繝上う繝悶Μ繝・ラ雉ｪ蝠冗函謌・ hybridQuestionService.ts
+   * - 繝悶Ο繝・けB,D: 霆ｽ驥上ユ繝ｳ繝励Ξ繝ｼ繝・   * - 繝悶Ο繝・けA,C: AI螳悟・逕滓・
+   */
+}
+
+export const adaptiveQuestionService = new AdaptiveQuestionService();
+export type { GoalAnalysis, AdaptiveQuestion, QuestionBlock };
+export { GoalClarificationNeeded };

@@ -7,7 +7,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { 
   generatePersonalizedQuests, 
   generateDefaultPreferences, 
-  PersonalizedQuest 
+  PersonalizedQuest,
+  testFallbackGeneration
 } from '../../utils/questPersonalization';
 import { GoalDeepDiveAnswers } from '../../types/questGeneration';
 
@@ -27,41 +28,101 @@ export default function QuestPreferencesScreen({ navigation, route, onComplete }
   const [personalizedQuests, setPersonalizedQuests] = useState<PersonalizedQuest[]>([]);
   const [preferences, setPreferences] = useState<{ [key: string]: PreferenceRating }>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   // AIパーソナライズドクエストの生成
   useEffect(() => {
     const generateQuests = async () => {
       try {
+        setIsLoading(true);
+        setError(null);
+        
         console.log('🎯 Starting AI quest generation from profile data:', profileData);
         console.log('📋 goalDeepDiveData received:', goalDeepDiveData);
         console.log('🎯 Goal text from goalDeepDiveData:', goalDeepDiveData?.goal_text);
         
+        // Debug: Test fallback generation first
+        console.log('🧪 Testing fallback generation before AI attempt...');
+        testFallbackGeneration();
+        
         // AIシステムでパーソナライズドクエストを生成
+        const forceMock = retryCount >= 2;
         const quests = await generatePersonalizedQuests(
           profileData.profileAnswers || {},
           goalDeepDiveData as GoalDeepDiveAnswers,
-          goalDeepDiveData?.goal_text  // OnboardingInputsの目標テキスト
+          goalDeepDiveData?.goal_text,  // OnboardingInputsの目標テキスト
+          forceMock
         );
         
         console.log('✅ Generated', quests.length, 'personalized quests');
         
+        // QP-03: Validate and enforce caps (≤45 min per quest, ≤90 total)
+        const validatedQuests = validateAndCapQuests(quests);
+        
+        if (validatedQuests.length === 0) {
+          throw new Error('No valid quests generated');
+        }
+        
         // デフォルトの推定評価を生成
-        const defaultPrefs = generateDefaultPreferences(quests, profileData.profileAnswers || {});
+        const defaultPrefs = generateDefaultPreferences(validatedQuests, profileData.profileAnswers || {});
         console.log('⚡ Generated default preferences:', defaultPrefs);
         
-        setPersonalizedQuests(quests);
+        setPersonalizedQuests(validatedQuests);
         setPreferences(defaultPrefs);
+        setError(null);
         setIsLoading(false);
       } catch (error) {
         console.error('❌ Error generating personalized quests:', error);
-        // エラー時は空の配列でフォールバックし、ローディングを終了
+        setError('クエストの生成に失敗しました。もう一度お試しください。');
         setPersonalizedQuests([]);
         setIsLoading(false);
       }
     };
 
     generateQuests();
-  }, [profileData, goalDeepDiveData]);
+  }, [profileData, goalDeepDiveData, retryCount]);
+
+  // QP-03: Validate and cap quests (≤45 min per quest, ≤90 total)
+  const validateAndCapQuests = (quests: PersonalizedQuest[]): PersonalizedQuest[] => {
+    if (!quests || quests.length === 0) return [];
+    
+    // Cap individual quest minutes to ≤45
+    const cappedQuests = quests.map(quest => ({
+      ...quest,
+      minutes: Math.min(quest.minutes || 30, 45), // Default 30min if missing, cap at 45
+      title: quest.title || 'Untitled Quest',
+      description: quest.description || 'Quest description unavailable',
+    }));
+    
+    // Ensure total time ≤90 minutes for onboarding preview
+    let totalMinutes = 0;
+    const validQuests: PersonalizedQuest[] = [];
+    
+    for (const quest of cappedQuests) {
+      if (totalMinutes + quest.minutes <= 90) {
+        validQuests.push(quest);
+        totalMinutes += quest.minutes;
+      } else {
+        // Try to fit a smaller version
+        const remainingTime = 90 - totalMinutes;
+        if (remainingTime >= 15) { // Minimum 15 minutes
+          validQuests.push({
+            ...quest,
+            minutes: remainingTime
+          });
+          break;
+        }
+      }
+    }
+    
+    return validQuests;
+  };
+
+  // QP-05: Retry functionality
+  const handleRetry = () => {
+    setRetryCount(prev => prev + 1);
+  };
 
   const handlePreferenceSelect = (questId: string, rating: PreferenceRating) => {
     setPreferences(prev => ({
@@ -126,22 +187,19 @@ export default function QuestPreferencesScreen({ navigation, route, onComplete }
             <Text style={styles.loadingText}>🤖 AIがあなた専用のクエストを生成中...</Text>
             <Text style={styles.loadingSubText}>プロファイル情報を分析しています</Text>
           </View>
-        ) : personalizedQuests.length === 0 ? (
+        ) : error ? (
           <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>⚠️  クエスト生成に失敗しました</Text>
-            <Text style={styles.errorSubText}>AIサービスに接続できません。ネットワークを確認してください。</Text>
+            <Text style={styles.errorText}>⚠️ {error}</Text>
+            <Text style={styles.errorSubText}>
+              {retryCount < 2 ? 'AI生成を再試行できます' : 'モックモードで続行できます'}
+            </Text>
             <TouchableOpacity 
               style={styles.retryButton}
-              onPress={() => {
-                setIsLoading(true);
-                setPersonalizedQuests([]);
-                // Re-trigger useEffect
-                setTimeout(() => {
-                  setIsLoading(false);
-                }, 100);
-              }}
+              onPress={handleRetry}
             >
-              <Text style={styles.retryButtonText}>再試行</Text>
+              <Text style={styles.retryButtonText}>
+                {retryCount < 2 ? '再試行' : 'モックモードで続行'}
+              </Text>
             </TouchableOpacity>
           </View>
         ) : (

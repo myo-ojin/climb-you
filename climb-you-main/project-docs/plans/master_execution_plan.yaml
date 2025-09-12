@@ -1,0 +1,168 @@
+metadata:
+  title: Master Execution Plan (E2E Orchestration)
+  version: 0.1.0
+  created: 2025-09-12
+  owners: ["delivery-lead", "mobile-core", "ai-core", "qa", "design-ux"]
+  intent: "Coordinate the implementation order across all plans to achieve reliable quest/milestone generation, persistence, and UX readiness."
+
+source_plans:
+  - file: generation_end_to_end_plan.yaml
+  - file: quest_milestone_hotfix_plan.yaml
+  - file: db_integration_fix_plan.yaml
+  - file: prompt_improvement_plan.yaml
+  - file: i18n_rollout_plan.yaml
+  - file: tone_friendly_language_plan.yaml
+  - file: mvp_release_readiness.yaml
+  - file: app_boot_splash_plan.yaml
+
+principles:
+  - "Ship value in thin vertical slices; keep changes non-breaking"
+  - "Feature-flag risky paths; always have a mock/local fallback"
+  - "Accept after observable checks (logs/smoke)"
+
+milestones:
+  - id: M0
+    name: MVP unblockers & basic generation
+    exit:
+      - "Quests reliably generated (>=3), time caps enforced"
+      - "Onboarding persisted (DB or local)"
+  - id: M1
+    name: E2E data loop (completion -> next-day)
+    exit:
+      - "Day 2 adapts based on Day 1 completion"
+  - id: M2
+    name: Tone & UX polish (en)
+    exit:
+      - "Friendly copy, required fields present, smoke all green"
+  - id: M3
+    name: i18n infra + language selection
+    exit:
+      - "en ready; language picker and OS app-language wiring"
+  - id: M4
+    name: Engines uplift (profile/milestone/quests)
+    exit:
+      - "pre_goal_analysis + SMART milestones + one-day builder"
+
+execution_order:
+  # Week 0 — Boot experience (visual polish; no feature risk)
+  - step: 0
+    title: "Boot & Splash experience"
+    tasks:
+      - plan: app_boot_splash_plan.yaml
+        ids: [SP-01_native_splash_assets, SP-02_expo_splash_screen, SP-03_boot_screen, SP-04_init_pipeline]
+    blocking: false
+
+  # Week 1 — Unblockers + Hotfixes (aim: M0)
+  - step: 1
+    title: "Fix Firestore service & demo write policy"
+    tasks:
+      - plan: db_integration_fix_plan.yaml
+        ids: [PR1_firestore_unify, PR2_demo_write_policy, PR3_onboarding_persist]
+      - plan: mvp_release_readiness.yaml
+        ids: [MF-android-package-id, MF-expo-deps-alignment, MF-service-signature-mismatch]
+    blocking: true
+  - step: 2
+    title: "Quest hotfixes (stable generation)"
+    tasks:
+      - plan: quest_milestone_hotfix_plan.yaml
+        ids: [T-HOTFIX-01, T-HOTFIX-02, T-HOTFIX-03, T-HOTFIX-04, T-HOTFIX-05]
+      - plan: generation_end_to_end_plan.yaml
+        ids: [HF1_call_fix, HF2_daytype_caps, HF3_guardrails, HF4_env_substitution, HF5_mock_diversify]
+    depends_on: [1]
+  - step: 3
+    title: "Minimal milestones uplift"
+    tasks:
+      - plan: quest_milestone_hotfix_plan.yaml
+        ids: [T-HOTFIX-07]
+      - plan: generation_end_to_end_plan.yaml
+        ids: [HF6_mini_backcast, HF7_policy_scope]
+    depends_on: [2]
+
+  # Week 2 — Data loop + UI wiring (aim: M1)
+  - step: 4
+    title: "Completion -> next-day loop + UI"
+    tasks:
+      - plan: db_integration_fix_plan.yaml
+        ids: [PR4_completion_to_nextday_loop, PR5_diagnose_visibility]
+      - plan: generation_end_to_end_plan.yaml
+        ids: [PR4_completion_nextday, UI1_todays_quests]
+    depends_on: [1,2]
+  - step: 5
+    title: "Enable AI path (optional now, gated by env)"
+    tasks:
+      - plan: generation_end_to_end_plan.yaml
+        ids: [CFG_ai_switch]
+    depends_on: [1]
+
+  # Week 3 — Tone + initial intelligence (aim: M2)
+  - step: 6
+    title: "Friendly tone (en)"
+    tasks:
+      - plan: tone_friendly_language_plan.yaml
+        ids: [TONE-01, TONE-02, TONE-03]
+    depends_on: [2,4]
+  - step: 7
+    title: "Pre-goal analysis stub"
+    tasks:
+      - plan: generation_end_to_end_plan.yaml
+        ids: [INT1_pre_goal_stub]
+      - plan: prompt_improvement_plan.yaml
+        ids: []  # uses specs only at this stage
+    depends_on: [6]
+
+  # Week 4 — i18n infra + tests (aim: M3)
+  - step: 8
+    title: "i18n infra + language selection"
+    tasks:
+      - plan: i18n_rollout_plan.yaml
+        ids: [T-001, T-003, T-005, T-006, T-007, T-008, T-009]
+    depends_on: [6]
+  - step: 9
+    title: "Observability + smoke tests"
+    tasks:
+      - plan: generation_end_to_end_plan.yaml
+        ids: [OBS1_metrics, TEST_smoke]
+    depends_on: [4]
+
+  # Later — Engines uplift (aim: M4)
+  - step: 10
+    title: "Engines uplift (profile/milestone/one-day)"
+    tasks:
+      - plan: prompt_improvement_plan.yaml
+        ids: [P1, P2, P3, P4, P5, M1, M2, M3, M4, Q1, Q2, Q3, Q4, A1, A2]
+    depends_on: [7,9]
+
+parallelization:
+  - cluster: "Unblockers"
+    steps: [1]
+  - cluster: "Hotfixes"
+    steps: [2,3]
+  - cluster: "Loop + UI + AI"
+    steps: [4,5]
+  - cluster: "Tone + i18n + Tests"
+    steps: [6,8,9]
+  - cluster: "Engines"
+    steps: [10]
+
+checkpoints:
+  - id: CP_M0
+    after_steps: [3]
+    verify:
+      - "quests >= 3; each <= 45; DayType cap"
+      - "onboarding persisted"
+  - id: CP_M1
+    after_steps: [4]
+    verify:
+      - "Day 2 adapts to Day 1 completion"
+  - id: CP_M2
+    after_steps: [6]
+    verify:
+      - "tone lint passes; friendly copy present"
+  - id: CP_M3
+    after_steps: [8,9]
+    verify:
+      - "i18n infra + language picker working; smoke all green"
+
+status:
+  current: planned
+  next_step: 0

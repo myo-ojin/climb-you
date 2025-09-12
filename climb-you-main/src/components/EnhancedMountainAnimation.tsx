@@ -185,7 +185,7 @@ export default function EnhancedMountainAnimation({
   const [animationState, setAnimationState] = useState<AnimationState>('idle');
   
   // ハイカー移動用のアニメーションref（トップレベルで定義）
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number>(0);
 
   // パス関連（React Native用に簡略化）
   const [hikerPosition, setHikerPosition] = useState<HikerPosition>({ x: 80, y: 560, angle: 0 });

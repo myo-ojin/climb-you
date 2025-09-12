@@ -1,0 +1,300 @@
+  difficulty_rating: z.number().min(800).max(2000).default(1200),
+  difficulty_hint: z.number().min(0).max(1).default(0.5),
+});
+
+export type Derived = z.infer<typeof DerivedSchema>;
+
+export const DailyCheckinSchema = z.object({
+  mood_energy: z.enum(["low", "mid", "high"]).default("mid"),
+  available_time_today_delta_min: z.number().int().min(-60).max(60).default(0),
+  focus_noise: z.enum(["low", "mid", "high"]).default("mid"),
+});
+
+export type DailyCheckins = z.infer<typeof DailyCheckinSchema>;
+
+export const PatternEnum = z.enum([
+  "read_note_q",
+  "flashcards", 
+  "build_micro",
+  "config_verify",
+  "debug_explain",
+  "feynman",
+  "past_paper",
+  "socratic",
+  "shadowing",
+  "retrospective",
+]);
+
+export type Pattern = z.infer<typeof PatternEnum>;
+
+export const SkillAtomSchema = z.object({
+  id: z.string().min(3),
+  label: z.string().min(3),
+  type: z.enum(["concept", "procedure", "habit"]),
+  level: z.enum(["intro", "basic", "intermediate", "advanced"]),
+  bloom: z.enum(["remember", "understand", "apply", "analyze", "evaluate", "create"]),
+  prereq: z.array(z.string()).default([]),
+  representative_tasks: z.array(z.string()).min(1).max(6),
+  suggested_patterns: z.array(PatternEnum).default([]),
+});
+
+export type SkillAtom = z.infer<typeof SkillAtomSchema>;
+
+export const QuestSchema = z.object({
+  title: z.string().min(4),
+  pattern: PatternEnum,
+  minutes: z.number().int().min(10).max(90),
+  difficulty: z.number().min(0).max(1).default(0.5),
+  deliverable: z.string().min(2),
+  steps: z.array(z.string()).min(1).max(3).optional(),
+  criteria: z.array(z.string()).min(1),
+  knowledge_check: z
+    .array(z.object({ q: z.string(), a: z.string() }))
+    .default([]),
+  tags: z.array(z.string()).min(1),
+});
+
+export type Quest = z.infer<typeof QuestSchema>;
+
+export const QuestListSchema = z.object({
+  quests: z.array(QuestSchema).min(3).max(5),
+  rationale: z.array(z.string()).optional(),
+});
+
+export type QuestList = z.infer<typeof QuestListSchema>;
+
+export const ConstraintsSchema = z.object({
+  total_minutes_max: z.number().int().min(10).max(300),
+  preferred_session_length_min: z.number().int().min(10).max(60),
+  novelty_ratio: z.number().min(0).max(1),
+  env_constraints: z.array(z.string()),
+  avoid_consecutive_same_pattern: z.boolean().default(true),
+});
+
+export type Constraints = z.infer<typeof ConstraintsSchema>;
+
+// -----------------------------
+// 2) 險ｭ險域嶌縺ｮ繝代ち繝ｼ繝ｳ螳夂ｾｩ繧貞ｮ悟・遘ｻ讀・// -----------------------------
+
+export const PATTERN_DEFS: Record<Pattern, string> = {
+  read_note_q:
+    "隱ｭ繧竊定ｦ∫せ繝｡繝｢竊定・菴・蝠擾ｼ亥ｭｦ繧薙□讎ょｿｵ繧・蝠上↓關ｽ縺ｨ縺苓ｾｼ繧・峨ら洒縺・ｦ句・縺励→邂・擅譖ｸ縺阪・,
+  flashcards:
+    "繝輔Λ繝・す繝･繧ｫ繝ｼ繝我ｽ懈・竊・0蛻・ｾ後そ繝ｫ繝輔メ繧ｧ繝・け縲ら畑隱・螳夂ｾｩ/萓九・3髱｢縺ｧ縲・,
+  build_micro:
+    "譛蟆乗・譫懃黄繧剃ｽ懊ｋ・亥ｰ上せ繧ｯ繝ｪ繝励ヨ/谿ｵ關ｽ/蝗ｳ/1蝠乗ｼ皮ｿ抵ｼ峨ょｮ梧・譚｡莉ｶ繧呈・遒ｺ蛹悶・,
+  config_verify:
+    "險ｭ螳壹・讒区・繧剃ｽ懊ｊ縲∵､懆ｨｼ繧ｳ繝槭Φ繝峨ｄ繝・せ繝医〒騾壹☆縲よ焔鬆・→譛溷ｾ・ｵ先棡繧呈・險倥・,
+  debug_explain:
+    "諢丞峙逧・↓螢翫☆/螢翫ｌ縺ｦ縺・ｋ莠玖ｱ｡繧定ｪｬ譏寂・蠕ｩ譌ｧ縲ょ次蝗莉ｮ隱ｬ縺ｨ讀懆ｨｼ繧定ｨ隱槫喧縲・,
+  feynman:
+    "2蛻・〒邏莠ｺ縺ｫ隱ｬ譏寂・逅・ｧ｣縺ｮ遨ｴ繧堤音螳壺・遨ｴ繧貞沂繧√ｋ陦悟虚縲・,
+  past_paper:
+    "莉｣陦ｨ/驕主悉蝠上ｒ3鬘後ょ推蝠上〒譬ｹ諡縺ｨ驕ｸ謚櫁い縺ｮ豸亥悉逅・罰繧定ｨ隱槫喧縲・,
+  socratic:
+    "AI縺ｨ蟇ｾ隧ｱ縺ｧ蝠上＞隧ｰ繧√ｋ縲らｫ句ｴ竊貞渚隲問・蜀榊渚隲悶〒蛻､譁ｭ譬ｹ諡繧貞ｼｷ蛹悶・,
+  shadowing:
+    "讓｡蜀・霑ｽ髫擾ｼ育匱隧ｱ/繧ｳ繝ｼ繝・ぅ繝ｳ繧ｰ・峨ら腸蠅・宛邏・↓蠢懊§縺ｦ逋ｺ隧ｱ竊堤┌髻ｳ讓｡蜀吶∈蛻・崛縲・,
+  retrospective:
+    "莉頑律縺ｮ蟄ｦ縺ｳ縺ｮ謖ｯ繧願ｿ斐ｊ竊呈・譌･縺ｮ荳謇九ｒ邂・擅譖ｸ縺阪〒豎ｺ繧√ｋ縲・,
+};
+
+export function patternsForPrompt(): string {
+  return Object.entries(PATTERN_DEFS)
+    .map(([k, v]) => `- ${k}: ${v}`)
+    .join("\n");
+}
+
+// -----------------------------
+// 3) 險ｭ險域嶌縺ｮLLM謚ｽ雎｡蛹悶ｒ螳悟・遘ｻ讀・// -----------------------------
+
+/** 險ｭ險域嶌縺ｮJSON謚ｽ蜃ｺ繝ｦ繝ｼ繝・ぅ繝ｪ繝・ぅ */
+export function extractFirstJson<T = unknown>(text: string): T {
+  // Try fenced blocks first
+  const fence = /```(?:json)?\n([\s\S]*?)\n```/i.exec(text);
+  const candidate = fence ? fence[1] : text;
+  // Find first '{' or '[' and attempt to parse up to matching end
+  const start = Math.min(
+    ...[candidate.indexOf("{"), candidate.indexOf("[")].filter((i) => i >= 0)
+  );
+  if (start === Infinity) throw new Error("No JSON found in LLM response");
+  // Heuristic: take from start to last '}' or ']'
+  const lastBrace = candidate.lastIndexOf("}");
+  const lastBracket = candidate.lastIndexOf("]");
+  const end = Math.max(lastBrace, lastBracket) + 1;
+  const jsonStr = candidate.slice(start, end).trim();
+  return JSON.parse(jsonStr) as T;
+}
+
+export interface LLM {
+  /** Return a text completion given system & user prompts. */
+  complete(opts: { system?: string; prompt: string; temperature?: number }): Promise<string>;
+
+  /** Convenience: complete and parse JSON with Zod validation. */
+  completeJson<T>(opts: {
+    system?: string;
+    prompt: string;
+    schema: z.ZodType<T>;
+    temperature?: number;
+  }): Promise<T>;
+}
+
+export class BasicLLM implements LLM {
+  constructor(private caller: (opts: { system?: string; prompt: string; temperature?: number }) => Promise<string>) {}
+  
+  async complete(opts: { system?: string; prompt: string; temperature?: number }): Promise<string> {
+    return this.caller(opts);
+  }
+  
+  async completeJson<T>({ system, prompt, schema, temperature }: { 
+    system?: string; 
+    prompt: string; 
+    schema: z.ZodType<T>; 
+    temperature?: number 
+  }): Promise<T> {
+    const txt = await this.complete({ system, prompt, temperature });
+    const raw = extractFirstJson<T>(txt);
+    const parsed = schema.parse(raw);
+    return parsed;
+  }
+}
+
+// -----------------------------
+// 4) 險ｭ險域嶌縺ｮ繝励Ο繝ｳ繝励ヨ繝薙Ν繝繝ｼ繧貞ｮ悟・遘ｻ讀・// -----------------------------
+
+export function buildSkillMapPrompt(args: {
+  goalText: string;
+  currentLevelTags?: string[];
+  priorityAreas?: string[];
+}): string {
+  const { goalText, currentLevelTags = [], priorityAreas = [] } = args;
+  return `縺ゅ↑縺溘・蟆る摩蛻・㍽繧貞・隗｣縺吶ｋ繧ｫ繝ｪ繧ｭ繝･繝ｩ繝險ｭ險郁・〒縺吶ゆｻ･荳九・逶ｮ讓吶ユ繧ｭ繧ｹ繝医→迴ｾ蝨ｨ蝨ｰ縺九ｉ縲∽ｻ雁ｾ・騾ｱ髢薙・蟄ｦ鄙偵↓菴ｿ縺・Skill Map 繧・JSON 縺ｧ霑斐＠縺ｦ縺上□縺輔＞縲・
+蜃ｺ蜉帙ヵ繧ｩ繝ｼ繝槭ャ繝・
+{
+  "skill_atoms": [
+    {
+      "id": "domain.topic.subtopic",
+      "label": "繧上°繧翫ｄ縺吶＞遏ｭ縺・錐蜑・,
+      "type": "concept|procedure|habit",
+      "level": "intro|basic|intermediate|advanced",
+      "bloom": "remember|understand|apply|analyze|evaluate|create",
+      "prereq": ["..."],
+      "representative_tasks": ["..."],
+      "suggested_patterns": ["read_note_q","build_micro","config_verify"]
+    }
+  ]
+}
+
+蛻ｶ邏・
+- atom 縺ｯ 12窶・8 蛟九よ尠譏ｧ隱槭ｒ驕ｿ縺代∵ｱ守畑逧・〒蜀榊茜逕ｨ蜿ｯ閭ｽ縺ｪ陦ｨ迴ｾ縺ｫ縺吶ｋ縲・- 蜷・atom 縺ｫ譛菴・縺､縺ｮ representative_task 繧貞・繧後ｋ・域焚蛟､繧・擅莉ｶ繧貞性繧∝・菴灘喧・峨・- 豕募ｾ句錐繧・崋譛牙錐隧槭↑縺ｩ遒ｺ險ｼ縺悟ｿ・ｦ√↑蝣ｴ蜷医・縲・representative_tasks" 縺ｫ "荳谺｡諠・ｱ繧堤｢ｺ隱・ 繧ｹ繝・ャ繝励ｒ蜷ｫ繧√ｋ縲・
+<GOAL_TEXT>
+${goalText}
+</GOAL_TEXT>
+<CURRENT_LEVEL_TAGS>${JSON.stringify(currentLevelTags)}</CURRENT_LEVEL_TAGS>
+<PRIORITY>${JSON.stringify(priorityAreas)}</PRIORITY>`;
+}
+
+export function buildDailyQuestsPrompt(args: {
+  profile: ProfileV1;
+  derived: Derived;
+  skillAtoms: SkillAtom[];
+  checkins: DailyCheckins;
+}): string {
+  const { profile, derived, skillAtoms, checkins } = args;
+  const patternsDoc = patternsForPrompt();
+  return `縺ゅ↑縺溘・蟄ｦ鄙偵・繝ｩ繝ｳ繝翫・縺ｧ縺吶ゆｻ･荳九・ profile/derived/skill_atoms/checkins 縺九ｉ縲∵悽譌･縺ｮ繧ｯ繧ｨ繧ｹ繝・3窶・ 莉ｶ繧・JSON 縺ｧ霑斐＠縺ｦ縺上□縺輔＞縲・pattern 縺ｯ谺｡縺ｮ螳夂ｾｩ縺九ｉ驕ｸ縺ｳ縺ｾ縺・
+${patternsDoc}
+
+蛻ｶ邏・
+- 蜷郁ｨ亥・謨ｰ 竕､ daily_capacity_min + available_time_today_delta_min
+- minutes 縺ｯ preferred_session_length_min 縺ｫ霑代▼縺代ｋ・按ｱ5蛻・〒荳ｸ繧∝庄・・- novelty_ratio 繧貞ｰ企㍾・域眠隕・蜿榊ｾｩ縺ｮ驟榊粋・・- 蜷檎ｨｮ pattern 縺ｮ騾｣邯壹・驕ｿ縺代ｋ
+- env_constraints 縺ｨ hard_constraints 繧貞ｰ企㍾・井ｾ・ 髻ｳ螢ｰ荳榊庄竊堤匱隧ｱ蝙九・讓｡蜀吶↓鄂ｮ謠幢ｼ・- **繧ｯ繧ｨ繧ｹ繝医・謠千､ｺ縺ｮ縺ｿ**・域焔蜿悶ｊ雜ｳ蜿悶ｊ縺ｮ隗｣隱ｬ繧・聞縺・焔鬆・・荳崎ｦ・ｼ峨Ｔteps 縺ｯ莉ｻ諢擾ｼ亥・繧後ｋ蝣ｴ蜷医・隕∫せ縺ｮ縺ｿ繝ｻ譛螟ｧ3陦鯉ｼ峨・- 蜷・け繧ｨ繧ｹ繝医・ difficulty 縺ｯ difficulty_hint・按ｱ0.1・峨↓蜷医ｏ縺帙ｋ縲・
+<PROFILE_JSON>
+${JSON.stringify(profile)}
+</PROFILE_JSON>
+<DERIVED_JSON>
+${JSON.stringify(derived)}
+</DERIVED_JSON>
+<CHECKINS>
+${JSON.stringify(checkins)}
+</CHECKINS>
+<SKILL_MAP_JSON>
+${JSON.stringify({ skill_atoms: skillAtoms.slice(0, 24) })}
+</SKILL_MAP_JSON>`;
+}
+
+export function buildPolicyCheckPrompt(args: {
+  questsCandidate: Quest[];
+  constraints: Constraints;
+}): string {
+  const { questsCandidate, constraints } = args;
+  return `谺｡縺ｮ quests[] 繧貞ｯｩ譟ｻ縺励∝宛邏・＆蜿阪・驥崎､・・繝｢繝ｼ繝牙￥繧翫ｒ讀懷・縺励※菫ｮ豁｣譯医ｒ蜃ｺ縺励∵怙邨ら沿繧・JSON 縺ｧ霑斐＠縺ｦ縺上□縺輔＞縲・菫ｮ豁｣譎ゅ・蜈・・逶ｮ逧・ｒ菫昴■縺､縺､ pattern/minutes 繧貞ｾｮ隱ｿ謨ｴ縺励※縺上□縺輔＞縲・
+蜈･蜉・
+<QUESTS_CANDIDATE>${JSON.stringify({ quests: questsCandidate })}</QUESTS_CANDIDATE>
+<CONSTRAINTS>${JSON.stringify(constraints)}</CONSTRAINTS>
+
+蜃ｺ蜉帙ヵ繧ｩ繝ｼ繝槭ャ繝・
+{
+  "quests": [ /* 3窶・莉ｶ */ ],
+  "rationale": ["菫ｮ豁｣逅・罰繧堤ｮ・擅譖ｸ縺・]
+}`;
+}
+
+// -----------------------------
+// 5) 險ｭ險域嶌縺ｮ繝倥Ν繝代・髢｢謨ｰ繧貞ｮ悟・遘ｻ讀・// -----------------------------
+
+export function difficultyHintFromMotivation(m: "low"|"mid"|"high"): number {
+  return m === "low" ? 0.35 : m === "high" ? 0.65 : 0.5;
+}
+
+export function heatMultiplier(heatLevel: number): number {
+  return { 1: 0.6, 2: 0.8, 3: 1.0, 4: 1.2, 5: 1.4 }[heatLevel as 1 | 2 | 3 | 4 | 5] ?? 1.0;
+}
+
+export function buildDerived(profile: ProfileV1): Derived {
+  const daily = Math.floor(profile.time_budget_min_per_day * 0.8 * heatMultiplier(profile.heat_level ?? 3));
+  const session = Math.max(10, Math.min(60, profile.preferred_session_length_min ?? 20));
+  const countHint = Math.max(3, Math.min(6, Math.round(daily / session)));
+  const novelty = profile.novelty_preference ?? 0.5;
+  const difficulty_hint = difficultyHintFromMotivation(profile.goal_motivation ?? "mid");
+  return { daily_capacity_min: daily, quest_count_hint: countHint, novelty_ratio: novelty, difficulty_rating: 1200, difficulty_hint };
+}
+
+export function buildConstraints(profile: ProfileV1, derived: Derived, checkins: DailyCheckins): Constraints {
+  return ConstraintsSchema.parse({
+    total_minutes_max: Math.max(10, derived.daily_capacity_min + (checkins.available_time_today_delta_min ?? 0)),
+    preferred_session_length_min: profile.preferred_session_length_min ?? 20,
+    novelty_ratio: derived.novelty_ratio,
+    env_constraints: profile.env_constraints,
+    avoid_consecutive_same_pattern: true,
+  });
+}
+
+// -----------------------------
+// 6) 蠕悟・逅・・繝ｫ繝代・・郁ｨｭ險域嶌螳悟・遘ｻ讀搾ｼ・// -----------------------------
+
+export function clampToSession(minutes: number, session: number): number {
+  const diff = minutes - session;
+  if (Math.abs(diff) <= 5) return session; // snap
+  return Math.max(10, Math.min(90, minutes));
+}
+
+export function avoidConsecutiveSamePattern(quests: Quest[]): Quest[] {
+  const out: Quest[] = [];
+  let last: Pattern | null = null;
+  for (const q of quests) {
+    if (last && q.pattern === last) {
+      // try to swap with previous if possible
+      const idx = out.findIndex((p) => p.pattern !== last);
+      if (idx >= 0) {
+        out.splice(idx, 0, q);
+      } else {
+        out.push(q); // give up, leave as-is
+      }
+    } else {
+      out.push(q);
+      last = q.pattern;
+    }
+  }
+  return out;
+}

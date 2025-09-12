@@ -57,12 +57,46 @@ export class EnvironmentConfig {
   }
 
   /**
-   * 現在の環境設定を表示
+   * Firebase 書き込みが有効かどうかを判定 - PR2: Demo write policy
+   */
+  static isFirebaseWriteEnabled(): boolean {
+    // EXPO_PUBLIC_FIREBASE_WRITE_ENABLED環境変数で制御
+    const writeEnabled = process.env.EXPO_PUBLIC_FIREBASE_WRITE_ENABLED;
+    
+    // 明示的にfalseに設定されている場合のみ無効
+    if (writeEnabled === 'false') {
+      return false;
+    }
+    
+    // デフォルトは有効（書き込みを行う）
+    return true;
+  }
+
+  /**
+   * データの永続化先を決定 - PR2: Demo write policy
+   * @returns 'firestore' | 'emulator' | 'local'
+   */
+  static getPersistenceTarget(): 'firestore' | 'emulator' | 'local' {
+    if (!this.isFirebaseWriteEnabled()) {
+      return 'local'; // 書き込み無効の場合はローカル保存
+    }
+    
+    if (this.isDemoMode() || this.useFirebaseEmulator()) {
+      return 'emulator'; // デモ/エミュレーターモード
+    }
+    
+    return 'firestore'; // 本番Firestore
+  }
+
+  /**
+   * 現在の環境設定を表示 - PR2: Demo write policy updated
    */
   static getEnvironmentInfo(): {
     mode: 'demo' | 'production';
     aiEnabled: boolean;
     firebaseEmulator: boolean;
+    firebaseWriteEnabled: boolean;
+    persistenceTarget: 'firestore' | 'emulator' | 'local';
     mockAI: boolean;
     debugMode: boolean;
   } {
@@ -70,6 +104,8 @@ export class EnvironmentConfig {
       mode: this.isDemoMode() ? 'demo' : 'production',
       aiEnabled: this.isAIEnabled(),
       firebaseEmulator: this.useFirebaseEmulator(),
+      firebaseWriteEnabled: this.isFirebaseWriteEnabled(),
+      persistenceTarget: this.getPersistenceTarget(),
       mockAI: this.isDemoMode() || process.env.EXPO_PUBLIC_USE_MOCK_AI === 'true',
       debugMode: process.env.EXPO_PUBLIC_DEBUG_API_CALLS === 'true'
     };

@@ -1,0 +1,134 @@
+metadata:
+  title: Database Integration Stabilization Plan (Firestore + Local Fallback)
+  version: 0.1.0
+  created: 2025-09-12
+  owners: ["mobile-core", "ai-core", "qa"]
+  intent: "Ensure user goals/profile/quests/progress are reliably saved and reused for next-day generation in all modes (demo/prod/offline)."
+
+goals:
+  - "Always persist onboarding outcome (profile, goal, initial quests, progress)"
+  - "Record quest completion and feed it into next-day generation"
+  - "Unify Firestore service with correct document paths; no silent skips in demo"
+
+causes:
+  - id: DEMO_SKIP
+    desc: "Demo mode skips Firestore writes; data not persisted for next day"
+  - id: FS_DOCPATH
+    desc: "Firestore service treats users/{uid} as a collection; uses empty docId ('') => invalid path"
+  - id: DUAL_SERVICES
+    desc: "Two Firestore services coexist (firebase/firestore.ts and firebase/firestoreService.ts) with mixed usage"
+  - id: LOOP_GAP
+    desc: "Completion → learning pattern → next-day generation loop not connected to DB; recentHistory not fetched from DB"
+
+strategy:
+  - "Non-breaking changes; optional flags; preserve current screens"
+  - "Single source of truth Firestore service; correct doc/collection builders"
+  - "Demo = save to emulator if available, else to local storage (never skip)"
+
+tasks:
+  - id: PR1_firestore_unify
+    title: "Unify Firestore service & fix document paths"
+    files: [
+      "climb-you-main/src/services/firebase/firestoreService.ts",
+      "climb-you-main/src/services/firebase/firestore.ts",
+      "climb-you-main/src/services/firebase/firebaseUserProfileService.ts"
+    ]
+    changes:
+      - "Treat users/{uid} as a document path (doc(db, 'users', uid)); remove use of empty documentId ''"
+      - "Provide helpers: userDoc(uid), subCol(uid, name) => users/{uid}/{name}"
+      - "Choose one service (prefer firestoreService.ts) and refactor callers to use it exclusively"
+    acceptance:
+      - "Create/read/update/delete users/{uid} without errors"
+      - "Create goals/quests/progress under users/{uid}/..."
+
+  - id: PR2_demo_write_policy
+    title: "Demo write policy: never skip persistence"
+    files: [
+      "climb-you-main/src/config/environmentConfig.ts",
+      "climb-you-main/src/config/apiKeys.ts",
+      "climb-you-main/README.md"
+    ]
+    changes:
+      - "Introduce EXPO_PUBLIC_FIREBASE_WRITE_ENABLED (true/false)"
+      - "If demo && FIREBASE_WRITE_ENABLED: connect to emulator and write; else: write to local storage (not skip)"
+      - "Document emulator host/ports and fallback behavior"
+    acceptance:
+      - "Demo mode persists to either emulator or local consistently"
+
+  - id: PR3_onboarding_persist
+    title: "Persist onboarding result (no skip)"
+    files: ["climb-you-main/src/services/firebase/firebaseUserProfileService.ts"]
+    changes:
+      - "Remove production-only write guard; always call saveToFirestore or local fallback"
+      - "Order: users/{uid} → goals → reference updates → quests → progress"
+      - "On error: log + local fallback; mark for retry (TODO)"
+    acceptance:
+      - "After onboarding, data exists (DB or local) and reloads on restart"
+
+  - id: PR4_completion_to_nextday_loop
+    title: "Wire completion → pattern update → next-day generation"
+    files: [
+      "climb-you-main/src/services/ai/dailyQuestService.ts",
+      "climb-you-main/src/services/firebase/firebaseUserProfileService.ts"
+    ]
+    changes:
+      - "recordDailyQuestCompletion: update quest status, append to progress, save learning pattern"
+      - "dailyQuestService.generateQuestsForDate: fetch recent history (7–30 days) from DB; fallback to local when offline"
+    acceptance:
+      - "Day 2 quests reflect Day 1 completions (difficulty/time/variety adjustments visible)"
+
+  - id: PR5_diagnose_visibility
+    title: "Startup diagnosis and logging"
+    files: ["climb-you-main/src/services/firebase/profileService.ts", "climb-you-main/App.tsx"]
+    changes:
+      - "Call diagnoseAuthAndFirestore() once on startup"
+      - "Log: auth user id, emulator/prod, write target, test write result"
+    acceptance:
+      - "Logs clearly show where data is being written/read"
+
+  - id: PR6_migration_optional
+    title: "Optional: migrate local onboarding cache to Firestore"
+    files: ["climb-you-main/src/services/firebase/firebaseUserProfileService.ts"]
+    changes:
+      - "If local cache exists and DB empty → upsert to DB and mark migrated"
+    acceptance:
+      - "Existing users keep their data when switching from demo-local to emulator/prod"
+
+verification:
+  smoke:
+    - "New user: complete onboarding → persist → restart → data reloaded"
+    - "Complete a quest: DB quest.status=completed; progress for today upserted"
+    - "Next day generation: uses DB history (total minutes cap & difficulty adjusted)"
+  manual:
+    - "Demo+Emulator ON: writes to emulator"
+    - "Demo+Emulator OFF: writes to local"
+    - "Prod+AI Mock/Real: both persist"
+
+acceptance_criteria:
+  - "Onboarding data (profile/goal/quests/progress) is always persisted (DB or local)"
+  - "Quest completion updates DB/local and influences next-day generation"
+  - "Single Firestore service with correct paths; no usage of empty docId"
+
+risks:
+  - "Existing code depending on skip behavior"
+  - "Data duplication between local and DB"
+mitigations:
+  - "Use upsert with deterministic keys (progress_YYYY-MM-DD, questId)"
+  - "Feature flags + clear logs"
+
+order:
+  - PR1_firestore_unify
+  - PR2_demo_write_policy
+  - PR3_onboarding_persist
+  - PR4_completion_to_nextday_loop
+  - PR5_diagnose_visibility
+  - PR6_migration_optional
+
+status:
+  PR1_firestore_unify: pending
+  PR2_demo_write_policy: pending
+  PR3_onboarding_persist: pending
+  PR4_completion_to_nextday_loop: pending
+  PR5_diagnose_visibility: pending
+  PR6_migration_optional: pending
+

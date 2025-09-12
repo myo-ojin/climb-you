@@ -7,6 +7,7 @@ import { ProfileAnswers } from '../types/onboardingQuestions';
 import { GoalDeepDiveAnswers } from '../types/questGeneration';
 import { ProfileV1, Quest } from '../services/ai/advancedQuestService.fixed';
 import { advancedQuestService } from '../services/ai/advancedQuestService.fixed';
+import { apiKeyManager } from '../config/apiKeys';
 
 export interface PersonalizedQuest {
   id: string;
@@ -53,7 +54,8 @@ const QUEST_POOL: QuestPool = {
       difficulty: 'medium',
       frequency: 'daily',
       estimatedRating: 'love',
-      confidenceScore: 0.9
+      confidenceScore: 0.9,
+      minutes: 30
     },
     {
       id: 'portfolio_project',
@@ -65,7 +67,8 @@ const QUEST_POOL: QuestPool = {
       difficulty: 'medium',
       frequency: 'weekly',
       estimatedRating: 'love',
-      confidenceScore: 0.85
+      confidenceScore: 0.85,
+      minutes: 45
     }
   ],
 
@@ -81,7 +84,8 @@ const QUEST_POOL: QuestPool = {
       difficulty: 'medium',
       frequency: 'daily',
       estimatedRating: 'love',
-      confidenceScore: 0.9
+      confidenceScore: 0.9,
+      minutes: 30
     },
     {
       id: 'teach_others',
@@ -109,7 +113,8 @@ const QUEST_POOL: QuestPool = {
       difficulty: 'easy',
       frequency: 'daily',
       estimatedRating: 'love',
-      confidenceScore: 0.95
+      confidenceScore: 0.95,
+      minutes: 15
     },
     {
       id: 'reflection_weekly',
@@ -137,7 +142,8 @@ const QUEST_POOL: QuestPool = {
       difficulty: 'easy',
       frequency: 'daily',
       estimatedRating: 'like',
-      confidenceScore: 0.7
+      confidenceScore: 0.7,
+      minutes: 5
     }
   ],
 
@@ -224,29 +230,63 @@ const QUEST_POOL: QuestPool = {
 export async function generatePersonalizedQuests(
   profileAnswers: ProfileAnswers,
   goalDeepDive?: GoalDeepDiveAnswers,
-  goalText?: string
+  goalText?: string,
+  forceMock: boolean = false
 ): Promise<PersonalizedQuest[]> {
   try {
     console.log('🎯 Starting AI quest generation...');
     console.log('🎯 Received goalText:', goalText);
     console.log('📋 Received goalDeepDive:', goalDeepDive);
+    console.log('🎭 Force mock mode:', forceMock);
+    
+    // QP-04: Force mock mode if requested
+    if (forceMock) {
+      console.log('🎭 Using forced mock mode');
+      return generateFallbackQuests(profileAnswers);
+    }
     
     // 1. プロファイル回答をProfileV1形式に変換
     const profile = convertToProfileV1(profileAnswers, goalDeepDive);
     console.log('📊 Converted profile:', profile);
     
-    // 2. AI生成サービスを初期化
-    if (!advancedQuestService.isInitialized()) {
-      const initialized = advancedQuestService.initialize();
-      if (!initialized) {
-        console.warn('⚠️  AI service initialization failed, falling back to static quests');
-        return generateFallbackQuests(profileAnswers);
+    // 2. AI生成サービスを強制的に初期化
+    console.log('🔧 Force initializing AI service...');
+    
+    // Check API key availability
+    const apiKey = apiKeyManager.getOpenAIKey();
+    console.log('🔑 API key available:', !!apiKey);
+    console.log('🤖 AI enabled:', apiKeyManager.isAIEnabled());
+    console.log('🤖 Should use real AI:', apiKeyManager.shouldUseRealAI());
+    
+    if (apiKey && !forceMock) {
+      // Force initialize with API key
+      console.log('🚀 Force initializing with API key...');
+      advancedQuestService.initializeWithKey(apiKey);
+      console.log('✅ AI service force initialized');
+    } else {
+      if (!advancedQuestService.isInitialized()) {
+        const initialized = advancedQuestService.initialize();
+        if (!initialized) {
+          console.warn('⚠️  AI service initialization failed, falling back to static quests');
+          return generateFallbackQuests(profileAnswers);
+        }
       }
     }
+    
+    // Check service status
+    const diagnosis = apiKeyManager.diagnoseConfiguration();
+    console.log('📊 API diagnosis:', diagnosis);
     
     // 3. AI生成クエストを取得
     const finalGoalText = goalText || goalDeepDive?.goal_focus?.note || '学習目標';
     console.log('🎯 Final goalText for AI generation:', finalGoalText);
+    
+    console.log('📡 Calling advancedQuestService.generateOptimizedQuests with:', {
+      goalText: finalGoalText,
+      profileKeys: Object.keys(profile),
+      currentLevelTags: profile.current_level_tags,
+      priorityAreas: profile.priority_areas
+    });
     
     const result = await advancedQuestService.generateOptimizedQuests({
       goalText: finalGoalText,
@@ -258,6 +298,12 @@ export async function generatePersonalizedQuests(
         available_time_today_delta_min: 0,
         focus_noise: 'mid'
       }
+    });
+    
+    console.log('📡 advancedQuestService result:', {
+      questCount: result.finalQuests?.quests?.length || 0,
+      hasQuests: !!result.finalQuests?.quests,
+      resultKeys: Object.keys(result || {})
     });
     
     // 4. AI生成クエストをPersonalizedQuest形式に変換
@@ -277,56 +323,115 @@ export async function generatePersonalizedQuests(
  * フォールバック用: 静的クエストプールから生成
  */
 function generateFallbackQuests(profileAnswers: ProfileAnswers): PersonalizedQuest[] {
+  console.log('🎭 Using fallback quest generation with profile:', profileAnswers);
+  
   const selectedQuests: PersonalizedQuest[] = [];
-
-  // 1. 目標志向に基づくクエスト選択
-  if (profileAnswers.goal_focus) {
-    const goalQuests = QUEST_POOL[profileAnswers.goal_focus as keyof typeof QUEST_POOL];
-    if (Array.isArray(goalQuests)) {
-      selectedQuests.push(...goalQuests.slice(0, 2)); // 上位2つ選択
+  
+  // Default quest pool - guaranteed to work
+  const defaultQuests: PersonalizedQuest[] = [
+    {
+      id: 'fallback_daily_study',
+      title: '毎日の学習タイム',
+      description: '目標に向けて毎日30分の集中学習',
+      category: '学習習慣',
+      emoji: '📚',
+      tags: ['study', 'daily', 'habit'],
+      difficulty: 'medium',
+      frequency: 'daily',
+      estimatedRating: 'love',
+      confidenceScore: 0.9,
+      minutes: 30
+    },
+    {
+      id: 'fallback_skill_practice',
+      title: 'スキル実践',
+      description: '学んだスキルを実際に使ってみる練習',
+      category: 'スキル向上',
+      emoji: '💻',
+      tags: ['skill', 'practice'],
+      difficulty: 'medium',
+      frequency: 'weekly',
+      estimatedRating: 'love',
+      confidenceScore: 0.8,
+      minutes: 45
+    },
+    {
+      id: 'fallback_reflection',
+      title: '振り返りタイム',
+      description: '学習の進捗を振り返って次のステップを計画',
+      category: '振り返り',
+      emoji: '🤔',
+      tags: ['reflection', 'planning'],
+      difficulty: 'easy',
+      frequency: 'weekly',
+      estimatedRating: 'like',
+      confidenceScore: 0.7,
+      minutes: 15
     }
+  ];
+
+  // Try profile-based selection first
+  try {
+    // 1. 目標志向に基づくクエスト選択
+    if (profileAnswers.goal_focus) {
+      const goalQuests = QUEST_POOL[profileAnswers.goal_focus as keyof typeof QUEST_POOL];
+      if (Array.isArray(goalQuests)) {
+        selectedQuests.push(...goalQuests.slice(0, 2)); // 上位2つ選択
+      }
+    }
+
+    // 2. 復習頻度に基づくクエスト選択
+    if (profileAnswers.review_cadence) {
+      const cadenceQuests = QUEST_POOL[profileAnswers.review_cadence as keyof typeof QUEST_POOL];
+      if (Array.isArray(cadenceQuests)) {
+        selectedQuests.push(...cadenceQuests.slice(0, 1)); // 1つ選択
+      }
+    }
+
+    // 3. 難易度バイアスに基づくクエスト選択
+    if (profileAnswers.difficulty_bias !== undefined) {
+      let difficultyCategory: 'easy' | 'medium' | 'hard';
+      if (profileAnswers.difficulty_bias < -0.05) {
+        difficultyCategory = 'easy';
+      } else if (profileAnswers.difficulty_bias > 0.1) {
+        difficultyCategory = 'hard'; 
+      } else {
+        difficultyCategory = 'medium';
+      }
+      
+      const difficultyQuests = QUEST_POOL[difficultyCategory];
+      selectedQuests.push(...difficultyQuests.slice(0, 1));
+    }
+
+    // 4. 重複除去とスコア調整
+    const uniqueQuests = selectedQuests.reduce((acc, quest) => {
+      const existingQuest = acc.find(q => q.id === quest.id);
+      if (!existingQuest) {
+        // Ensure minutes is set
+        quest.minutes = quest.minutes || 30;
+        acc.push(quest);
+      } else {
+        // 重複した場合は信頼スコアを上げる
+        existingQuest.confidenceScore = Math.min(1.0, existingQuest.confidenceScore + 0.1);
+      }
+      return acc;
+    }, [] as PersonalizedQuest[]);
+
+    // 5. 信頼スコア順でソート
+    uniqueQuests.sort((a, b) => b.confidenceScore - a.confidenceScore);
+
+    // 6. If we have enough quests, return them
+    if (uniqueQuests.length >= 3) {
+      console.log('✅ Profile-based fallback generated', uniqueQuests.length, 'quests');
+      return uniqueQuests.slice(0, 4);
+    }
+  } catch (error) {
+    console.warn('⚠️ Profile-based fallback failed, using default quests:', error);
   }
 
-  // 2. 復習頻度に基づくクエスト選択
-  if (profileAnswers.review_cadence) {
-    const cadenceQuests = QUEST_POOL[profileAnswers.review_cadence as keyof typeof QUEST_POOL];
-    if (Array.isArray(cadenceQuests)) {
-      selectedQuests.push(...cadenceQuests.slice(0, 1)); // 1つ選択
-    }
-  }
-
-  // 3. 難易度バイアスに基づくクエスト選択
-  if (profileAnswers.difficulty_bias !== undefined) {
-    let difficultyCategory: 'easy' | 'medium' | 'hard';
-    if (profileAnswers.difficulty_bias < -0.05) {
-      difficultyCategory = 'easy';
-    } else if (profileAnswers.difficulty_bias > 0.1) {
-      difficultyCategory = 'hard'; 
-    } else {
-      difficultyCategory = 'medium';
-    }
-    
-    const difficultyQuests = QUEST_POOL[difficultyCategory];
-    selectedQuests.push(...difficultyQuests.slice(0, 1));
-  }
-
-  // 4. 重複除去とスコア調整
-  const uniqueQuests = selectedQuests.reduce((acc, quest) => {
-    const existingQuest = acc.find(q => q.id === quest.id);
-    if (!existingQuest) {
-      acc.push(quest);
-    } else {
-      // 重複した場合は信頼スコアを上げる
-      existingQuest.confidenceScore = Math.min(1.0, existingQuest.confidenceScore + 0.1);
-    }
-    return acc;
-  }, [] as PersonalizedQuest[]);
-
-  // 5. 信頼スコア順でソート
-  uniqueQuests.sort((a, b) => b.confidenceScore - a.confidenceScore);
-
-  // 6. 最大4つまでに制限
-  return uniqueQuests.slice(0, 4);
+  // Fallback to default quests if profile-based selection failed
+  console.log('✅ Using default fallback quests');
+  return defaultQuests;
 }
 
 /**
@@ -492,4 +597,26 @@ export function generateDefaultPreferences(quests: PersonalizedQuest[], profileA
   });
 
   return preferences;
+}
+
+/**
+ * Debug: Test fallback quest generation
+ */
+export function testFallbackGeneration(): PersonalizedQuest[] {
+  console.log('🧪 Testing fallback quest generation...');
+  
+  const mockProfile = {
+    goal_focus: 'skill',
+    review_cadence: 'daily',
+    difficulty_bias: 0.1,
+    novelty_preference: 0.5
+  };
+  
+  const result = generateFallbackQuests(mockProfile);
+  console.log('🧪 Test result:', result.length, 'quests generated');
+  result.forEach((quest, index) => {
+    console.log(`🧪 Quest ${index + 1}:`, quest.title, `(${quest.minutes}min)`);
+  });
+  
+  return result;
 }

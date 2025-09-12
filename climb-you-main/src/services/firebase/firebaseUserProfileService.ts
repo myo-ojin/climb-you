@@ -27,6 +27,7 @@ import { advancedQuestService } from '../ai/advancedQuestService.fixed';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Timestamp } from 'firebase/firestore';
 import { EnvironmentConfig } from '../../config/environmentConfig';
+import { localStorageService } from '../localStorage/localStorageService';
 
 class FirebaseUserProfileService {
   private readonly STORAGE_KEYS = {
@@ -102,11 +103,12 @@ class FirebaseUserProfileService {
         throw new Error(`Firebase data conversion failed: ${conversionError.message}`);
       }
       
-      // 6. Firestoreに保存 (デモモードではスキップ)
+      // 6. データを永続化 (PR3: Always persist onboarding result - never skip)
       const envInfo = EnvironmentConfig.getEnvironmentInfo();
       console.log('💾 Firebase Save Decision:', {
         mode: envInfo.mode,
-        shouldSave: envInfo.mode === 'production',
+        persistenceTarget: envInfo.persistenceTarget,
+        alwaysPersist: true, // PR3: Never skip persistence
         userId: userId,
         dataStructure: {
           userProfile: !!firebaseData.userProfile,
@@ -117,17 +119,14 @@ class FirebaseUserProfileService {
         }
       });
       
-      if (envInfo.mode === 'production') {
-        try {
-          console.log('💾 Starting Firestore save operation...');
-          await this.saveToFirestore(userId, firebaseData);
-          console.log('✅ Data saved to Firestore successfully');
-        } catch (firestoreError) {
-          console.error('❌ Firestore save failed:', firestoreError);
-          console.log('⚠️ Continuing with local storage fallback');
-        }
-      } else {
-        console.log(`🎭 ${envInfo.mode.toUpperCase()} mode: Skipping Firestore save`);
+      try {
+        console.log(`💾 Starting persistence operation to ${envInfo.persistenceTarget}...`);
+        await this.saveToFirestore(userId, firebaseData);
+        console.log(`✅ Onboarding data persisted successfully to ${envInfo.persistenceTarget}`);
+      } catch (persistenceError) {
+        console.error('❌ Persistence operation failed:', persistenceError);
+        // This should not happen with PR2 fallback mechanism, but log for debugging
+        throw new Error(`Failed to persist onboarding data: ${persistenceError.message}`);
       }
       
       // 7. 統合プロファイル形式で返却
@@ -1009,6 +1008,114 @@ class FirebaseUserProfileService {
     } catch (error) {
       console.error('❌ Error checking onboarding status:', error);
       return false;
+    }
+  }
+
+  // ============================================================================
+  // PR6: MIGRATION FUNCTIONALITY
+  // ============================================================================
+
+  /**
+   * Migrate local onboarding cache to Firestore - PR6: Optional migration
+   */
+  async migrateLocalCacheToFirestore(userId: string): Promise<boolean> {
+    try {
+      console.log('📤 Checking for local cache migration...');
+
+      // 1. Check if user has local data
+      const hasLocalData = await localStorageService.hasLocalData(userId);
+      if (!hasLocalData) {
+        console.log('📭 No local data found for migration');
+        return false;
+      }
+
+      // 2. Check if already migrated
+      const alreadyMigrated = await localStorageService.isMigrated(userId);
+      if (alreadyMigrated) {
+        console.log('📦 User data already migrated');
+        return false;
+      }
+
+      // 3. Check if DB is empty (avoid overwriting existing data)
+      const existingProfile = await firestoreService.getUserProfile(userId);
+      if (existingProfile?.onboardingCompleted) {
+        console.log('🏢 User already has complete data in Firestore, skipping migration');
+        await localStorageService.markAsMigrated(userId);
+        return false;
+      }
+
+      console.log('🔄 Starting local to Firestore migration...');
+
+      // 4. Migrate user profile
+      const localProfile = await localStorageService.getUserProfile(userId);
+      if (localProfile) {
+        await firestoreService.createUserProfile(userId, localProfile);
+        console.log('✅ Profile migrated');
+      }
+
+      // 5. Migrate goals
+      const localGoals = await localStorageService.getUserGoals(userId);
+      for (const goal of localGoals) {
+        await firestoreService.createGoal(userId, goal);
+      }
+      if (localGoals.length > 0) {
+        console.log(`✅ ${localGoals.length} goals migrated`);
+      }
+
+      // 6. Migrate quests
+      const localQuests = await localStorageService.getUserQuests(userId);
+      if (localQuests.length > 0) {
+        await firestoreService.createQuests(userId, localQuests);
+        console.log(`✅ ${localQuests.length} quests migrated`);
+      }
+
+      // 7. Migrate progress
+      const localProgress = await localStorageService.getUserProgress(userId, 90); // Last 90 days
+      for (const progress of localProgress) {
+        await firestoreService.updateDailyProgress(userId, progress);
+      }
+      if (localProgress.length > 0) {
+        console.log(`✅ ${localProgress.length} progress entries migrated`);
+      }
+
+      // 8. Mark as migrated
+      await localStorageService.markAsMigrated(userId);
+      console.log('📤 Local cache migration completed successfully');
+
+      return true;
+
+    } catch (error) {
+      console.error('❌ Local cache migration failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Attempt migration on app startup - PR6: Optional migration
+   */
+  async attemptStartupMigration(): Promise<void> {
+    try {
+      const userId = await getCurrentUserId();
+      if (!userId) {
+        console.log('👤 No user ID available for migration');
+        return;
+      }
+
+      // Only attempt migration if Firestore is available
+      const envInfo = EnvironmentConfig.getEnvironmentInfo();
+      if (envInfo.persistenceTarget === 'local') {
+        console.log('💾 Persistence target is local, skipping migration');
+        return;
+      }
+
+      // Attempt migration
+      const migrated = await this.migrateLocalCacheToFirestore(userId);
+      if (migrated) {
+        console.log('🎉 Startup migration completed successfully');
+      }
+
+    } catch (error) {
+      console.warn('⚠️ Startup migration failed, continuing with normal flow:', error);
     }
   }
 }

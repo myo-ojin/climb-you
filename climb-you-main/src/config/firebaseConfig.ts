@@ -55,9 +55,9 @@ let functions: Functions;
  */
 export const initializeFirebaseServices = async (): Promise<{
   app: any;
-  firestore: Firestore;
-  auth: Auth;
-  functions: Functions;
+  firestore: Firestore | null;
+  auth: Auth | null;
+  functions: Functions | null;
 }> => {
   try {
     const envInfo = EnvironmentConfig.getEnvironmentInfo();
@@ -190,7 +190,7 @@ export const signInAnonymousUser = async (): Promise<string> => {
 
     // Check for stored user ID
     const storedUserId = await AsyncStorage.getItem('firebase_user_id');
-    if (storedUserId && auth.currentUser && auth.currentUser.uid === storedUserId) {
+    if (storedUserId && auth && auth.currentUser && auth.currentUser.uid === storedUserId) {
       console.log('👤 Using stored user ID:', storedUserId);
       return storedUserId;
     }

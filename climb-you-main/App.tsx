@@ -8,6 +8,7 @@ import { hybridStorageService } from './src/services/storage/hybridStorage';
 import { firebaseUserProfileService } from './src/services/firebase/firebaseUserProfileService';
 import { EnvironmentConfig } from './src/config/environmentConfig';
 import { TaskProvider } from './src/contexts/TaskContext';
+import { firebaseDiagnosticService } from './src/services/firebase/firebaseDiagnosticService';
 
 const ONBOARDING_COMPLETED_KEY = 'onboarding_completed';
 
@@ -34,6 +35,20 @@ export default function App() {
         }
       } catch (firebaseError) {
         console.log('⚠️ Firebase initialization failed, continuing in demo mode:', firebaseError);
+      }
+
+      // PR5: Run Firebase diagnostic after initialization
+      try {
+        await firebaseDiagnosticService.quickStartupDiagnosis();
+      } catch (diagnosticError) {
+        console.warn('⚠️ Firebase diagnostic failed:', diagnosticError);
+      }
+
+      // PR6: Attempt optional migration of local cache to Firestore
+      try {
+        await firebaseUserProfileService.attemptStartupMigration();
+      } catch (migrationError) {
+        console.warn('⚠️ Migration attempt failed:', migrationError);
       }
       
       // Initialize hybrid storage

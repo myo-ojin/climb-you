@@ -56,11 +56,11 @@ export default function GoalInputScreen({ navigation }: GoalInputScreenProps) {
         let alertMessage = '目標をもう少し具体的にしていただけますか？\n\n';
         
         if (analysis.suggestions.length > 0) {
-          alertMessage += '提案:\n' + analysis.suggestions.slice(0, 3).map(s => `• ${s}`).join('\n');
+          alertMessage += '提案:\n' + analysis.suggestions.slice(0, 3).map((s: string) => `• ${s}`).join('\n');
         }
         
         if (analysis.examples.length > 0) {
-          alertMessage += '\n\n例:\n' + analysis.examples.slice(0, 2).map(e => `• ${e}`).join('\n');
+          alertMessage += '\n\n例:\n' + analysis.examples.slice(0, 2).map((e: string) => `• ${e}`).join('\n');
         }
         
         Alert.alert(

@@ -1,0 +1,86 @@
+      {"id":"opt2","label":"窶ｦ","value":"窶ｦ","dataKey":"capstone_type"},
+      {"id":"opt3","label":"窶ｦ","value":"窶ｦ","dataKey":"capstone_type"},
+      {"id":"opt4","label":"窶ｦ","value":"窶ｦ","dataKey":"capstone_type"}
+    ]}
+  ]
+}
+```
+
+閾ｪ蟾ｱ讀懈渊・亥・蜉帷峩蜑搾ｼ・- 3蝠湘怜推4謚槭°・重ataKey縺ｨvalue蝙九′蜷・撫縺ｧ荳雋ｫ縺励※縺・ｋ縺九・- 蜷・撫縺ｫ蝗ｺ譛芽ｪ槭′蜷ｫ縺ｾ繧後※縺・ｋ縺具ｼ医し繝悶ラ繝｡繧､繝ｳ/繧ｭ繝ｼ繝ｯ繝ｼ繝臥罰譚･・峨・- JSON縺ｮ縺ｿ縺具ｼ医ヵ繧ｧ繝ｳ繧ｹ螟悶↓譁・ｭ励′縺ｪ縺・ｼ峨・隕∽ｻｶ驕募渚縺後≠繧後・譛蟆丈ｿｮ豁｣縺励※縺九ｉ蜃ｺ蜉帙☆繧九％縺ｨ縲Ａ + "\n" + prompt;
+
+      const response = await advancedQuestService.generateCustom({
+        userGoal: `${goalAnalysis.domain} - ${goalAnalysis.subDomain}`,
+        timeConstraintMinutes: 30,
+        userPreferences: { difficulty: 'medium' },
+        customPrompt: finalPromptC
+      });
+
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No JSON found in BlockC AI response');
+      }
+
+      const blockData = JSON.parse(jsonMatch[0]);
+      
+      return {
+        blockId: 'C',
+        blockTitle: blockData.blockTitle || '謌先棡縺ｮ遒ｺ隱肴婿豕・,
+        blockDescription: blockData.blockDescription || `${goalAnalysis.domain}縺ｮ謌先棡遒ｺ隱肴婿豕輔ｒ險ｭ螳壹＠縺ｾ縺兪,
+        questions: blockData.questions.map((q: any, index: number) => ({
+          id: `C${index + 1}`,
+          blockId: 'C' as const,
+          stepInBlock: (index + 1) as 1 | 2 | 3,
+          question: q.question,
+          options: q.options,
+          hasOptionalMemo: true,
+          goalContext: `${goalAnalysis.domain}蛻・㍽縺ｧ縺ｮ謌先棡遒ｺ隱・{index + 1}`
+        }))
+      };
+
+    } catch (error) {
+      console.error('BlockC AI generation failed, using fallback:', error);
+      return this.generateBlockC_Fallback(goalAnalysis);
+    }
+  }
+
+  /**
+   * 繝悶Ο繝・けD: 繝・Φ繝励Ξ迚・(邯咏ｶ壼ｯｾ遲・ - 豎守畑逧・   */
+  private generateBlockD_Template(goalAnalysis: GoalAnalysis): QuestionBlock {
+    return {
+      blockId: 'D',
+      blockTitle: '邯咏ｶ壹・縺溘ａ縺ｮ蟇ｾ遲・,
+      blockDescription: '謖ｫ謚倥＠繧・☆縺・ヱ繧ｿ繝ｼ繝ｳ縺ｨ蟇ｾ蜃ｦ豕輔ｒ險ｭ螳壹＠縺ｾ縺・,
+      questions: [
+        {
+          id: 'D1',
+          blockId: 'D',
+          stepInBlock: 1,
+          question: '縺ｩ繧薙↑譎ゅ↓縺､縺ｾ縺壹″繧・☆縺・〒縺吶°・・,
+          options: [
+            { id: 'time', label: '譎る俣縺後↑縺上※邯咏ｶ壹〒縺阪↑縺・, value: 'time', dataKey: 'dropoff_type' },
+            { id: 'difficulty', label: '蜀・ｮｹ縺碁屮縺励￥縺ｦ騾ｲ縺ｾ縺ｪ縺・, value: 'difficulty', dataKey: 'dropoff_type' },
+            { id: 'focus', label: '髮・ｸｭ縺檎ｶ壹°縺壽ｰ励′謨｣縺｣縺ｦ縺励∪縺・, value: 'focus', dataKey: 'dropoff_type' },
+            { id: 'meaning', label: '縺ｪ繧薙・縺溘ａ縺ｫ繧・▲縺ｦ縺・ｋ縺句・縺九ｉ縺ｪ縺・, value: 'meaning', dataKey: 'dropoff_type' }
+          ],
+          hasOptionalMemo: true,
+          goalContext: '蜈ｸ蝙狗噪縺ｪ謖ｫ謚倥ヱ繧ｿ繝ｼ繝ｳ縺ｮ迚ｹ螳・
+        },
+        {
+          id: 'D2',
+          blockId: 'D',
+          stepInBlock: 2,
+          question: '縺ｩ繧薙↑縺阪▲縺九￠縺ｧ繧・ａ縺ｦ縺励∪縺・′縺｡縺ｧ縺吶°・・,
+          options: [
+            { id: 'fatigue', label: '莉穂ｺ九〒逍ｲ繧後※繧・ｋ豌励′襍ｷ縺阪↑縺・, value: 'fatigue', dataKey: 'dropoff_trigger' },
+            { id: 'schedule_slip', label: '莠亥ｮ壹′繧ｺ繝ｬ縺ｦ譎る俣縺後↑縺上↑繧・, value: 'schedule_slip', dataKey: 'dropoff_trigger' },
+            { id: 'notification_noise', label: '繧ｹ繝槭・繧・尅髻ｳ縺ｧ髮・ｸｭ縺碁泌・繧後ｋ', value: 'notification_noise', dataKey: 'dropoff_trigger' },
+            { id: 'task_too_long', label: '繧・ｋ縺薙→縺悟､壹￥縺ｦ髱｢蛟偵↓縺ｪ繧・, value: 'task_too_long', dataKey: 'dropoff_trigger' }
+          ],
+          hasOptionalMemo: true,
+          parentDependency: 'D1',
+          goalContext: '謖ｫ謚倥・縺阪▲縺九￠縺ｨ縺ｪ繧句・菴鍋噪縺ｪ繝医Μ繧ｬ繝ｼ'
+        },
+        {
+          id: 'D3',
+          blockId: 'D',
+          stepInBlock: 3,

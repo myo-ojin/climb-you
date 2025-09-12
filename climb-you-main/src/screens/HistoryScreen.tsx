@@ -120,7 +120,7 @@ export default function HistoryScreen({ userId = 'default' }: HistoryScreenProps
               strokeWidth: 3,
             }],
           }}
-          width={screenWidth - 40}
+          width={screenWidth - 72}
           height={220}
           chartConfig={{
             backgroundColor: colors.cardBackground,
@@ -134,6 +134,11 @@ export default function HistoryScreen({ userId = 'default' }: HistoryScreenProps
               r: '6',
               strokeWidth: '2',
               stroke: colors.chartPrimary,
+            },
+            propsForBackgroundLines: {
+              strokeWidth: 1,
+              stroke: colors.border,
+              strokeOpacity: 0.1,
             },
           }}
           bezier
@@ -180,8 +185,10 @@ export default function HistoryScreen({ userId = 'default' }: HistoryScreenProps
               data: weeklyStats.slice(-4).map(w => w.totalMinutes),
             }],
           }}
-          width={screenWidth - 40}
+          width={screenWidth - 72}
           height={220}
+          yAxisLabel=""
+          yAxisSuffix="分"
           chartConfig={{
             backgroundColor: colors.cardBackground,
             backgroundGradientFrom: colors.white,
@@ -190,6 +197,11 @@ export default function HistoryScreen({ userId = 'default' }: HistoryScreenProps
             color: () => colors.chartSecondary,
             labelColor: () => colors.text,
             style: { borderRadius: 16 },
+            propsForBackgroundLines: {
+              strokeWidth: 1,
+              stroke: colors.border,
+              strokeOpacity: 0.1,
+            },
           }}
           style={styles.chart}
         />
@@ -199,19 +211,6 @@ export default function HistoryScreen({ userId = 'default' }: HistoryScreenProps
       <View style={styles.patternContainer}>
         <Text style={styles.sectionTitle}>学習パターン分析</Text>
         
-        {/* Most Used Patterns */}
-        <View style={styles.patternCard}>
-          <Text style={styles.patternCardTitle}>よく使うパターン</Text>
-          {getTopPatterns(questHistory).map((pattern, index) => (
-            <View key={index} style={styles.patternItem}>
-              <Text style={styles.patternName}>{pattern.pattern}</Text>
-              <View style={styles.patternStats}>
-                <Text style={styles.patternCount}>{pattern.count}回</Text>
-                <Text style={styles.patternRate}>{Math.round(pattern.successRate * 100)}%成功</Text>
-              </View>
-            </View>
-          ))}
-        </View>
 
         {/* Difficulty Progression */}
         <View style={styles.patternCard}>
@@ -363,9 +362,9 @@ function generateMockHistory(days: number): QuestHistory[] {
         pattern: patterns[Math.floor(Math.random() * patterns.length)],
         completedAt: wasSuccessful ? date.getTime() : undefined,
         actualMinutes: wasSuccessful ? Math.floor(Math.random() * 30) + 15 : undefined,
-        difficulty: Math.random() * 0.8 + 0.2,
+        difficulty: Math.floor(Math.random() * 5) + 1,
         wasSuccessful,
-        userRating: wasSuccessful ? Math.floor(Math.random() * 3) + 3 : undefined, // 3-5 rating
+        userRating: wasSuccessful ? (Math.floor(Math.random() * 3) + 3) as 3 | 4 | 5 : undefined, // 3-5 rating
         date: date.toISOString().split('T')[0],
       });
     }
@@ -407,27 +406,6 @@ function calculateWeeklyStats(history: QuestHistory[]): WeeklyStats[] {
   }).sort((a, b) => a.week.localeCompare(b.week));
 }
 
-function getTopPatterns(history: QuestHistory[]) {
-  const patternMap = new Map<string, { count: number; successes: number }>();
-  
-  history.forEach(quest => {
-    if (!patternMap.has(quest.pattern)) {
-      patternMap.set(quest.pattern, { count: 0, successes: 0 });
-    }
-    const stats = patternMap.get(quest.pattern)!;
-    stats.count++;
-    if (quest.wasSuccessful) stats.successes++;
-  });
-
-  return Array.from(patternMap.entries())
-    .map(([pattern, stats]) => ({
-      pattern,
-      count: stats.count,
-      successRate: stats.count > 0 ? stats.successes / stats.count : 0,
-    }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5);
-}
 
 function generateMockAnalysis(): DetailedLearningAnalysis {
   return {
@@ -702,32 +680,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.text,
     marginBottom: 12,
-  },
-  patternItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.1)',
-  },
-  patternName: {
-    fontSize: 14,
-    color: colors.text,
-    fontWeight: '500',
-  },
-  patternStats: {
-    alignItems: 'flex-end',
-  },
-  patternCount: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginBottom: 2,
-  },
-  patternRate: {
-    fontSize: 12,
-    color: colors.success,
-    fontWeight: '500',
   },
   insightSection: {
     marginBottom: 32,

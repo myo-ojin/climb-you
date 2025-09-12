@@ -1,0 +1,141 @@
+  async policyCheck(args: { 
+    quests: Quest[]; 
+    profile: ProfileV1;
+    checkins?: DailyCheckins;
+  }): Promise<QuestList> {
+    if (!this.llm) {
+      const diagnosis = this.getDiagnosticInfo();
+      throw new Error(`AdvancedQuestService not initialized. API Key available: ${diagnosis.apiKeyAvailable}. Call initialize() first.`);
+    }
+
+    const checkins = args.checkins ?? {
+      mood_energy: "mid",
+      available_time_today_delta_min: 0,
+      focus_noise: "mid"
+    };
+
+    const derived = buildDerived(args.profile);
+    const constraints = buildConstraints(args.profile, derived, checkins);
+    const prompt = buildPolicyCheckPrompt({ 
+      questsCandidate: args.quests, 
+      constraints 
+    });
+
+    try {
+      const result = await this.llm.completeJson({ 
+        system: "You are a careful policy checker.", 
+        prompt, 
+        schema: QuestListSchema 
+      });
+
+      // 險ｭ險域嶌縺ｮ蛻ｶ邏・メ繧ｧ繝・け繧帝←逕ｨ
+      const total = result.quests.reduce((s, q) => s + q.minutes, 0);
+      if (total > constraints.total_minutes_max) {
+        // naive scale-down pass
+        const scale = constraints.total_minutes_max / total;
+        result.quests = result.quests.map((q) => ({ 
+          ...q, 
+          minutes: Math.max(10, Math.round(q.minutes * scale)) 
+        }));
+      }
+
+      result.quests = avoidConsecutiveSamePattern(result.quests);
+      return result;
+    } catch (error) {
+      console.error('Policy check failed:', error);
+      throw new Error('繧ｯ繧ｨ繧ｹ繝医・蜩∬ｳｪ繝√ぉ繝・け縺ｫ螟ｱ謨励＠縺ｾ縺励◆');
+    }
+  }
+
+  /**
+   * 繧ｨ繝ｳ繝峨ヤ繝ｼ繧ｨ繝ｳ繝峨・繧ｯ繧ｨ繧ｹ繝育函謌舌ヱ繧､繝励Λ繧､繝ｳ・郁ｨｭ險域嶌騾壹ｊ・・   */
+  async generateOptimizedQuests(args: {
+    goalText: string;
+    profile: ProfileV1;
+    currentLevelTags?: string[];
+    priorityAreas?: string[];
+    checkins?: DailyCheckins;
+  }): Promise<{
+    skillAtoms: SkillAtom[];
+    questsCandidate: Quest[];
+    finalQuests: QuestList;
+  }> {
+    console.log('識 Step 1: Generating skill map...');
+    console.log('識 Step 1 Input:', {
+      goalText: args.goalText,
+      currentLevelTags: args.currentLevelTags,
+      priorityAreas: args.priorityAreas,
+      useRealAI: this.useRealAI,
+      isInitialized: this.isInitialized()
+    });
+    
+    const skillAtoms = await this.generateSkillMap({
+      goalText: args.goalText,
+      currentLevelTags: args.currentLevelTags,
+      priorityAreas: args.priorityAreas,
+    });
+    console.log('識 Step 1 Complete: Generated', skillAtoms.length, 'skill atoms');
+
+    console.log('笞｡ Step 2: Generating daily quests...');
+    console.log('笞｡ Step 2 Input:', {
+      profileGoal: args.profile.long_term_goal,
+      skillAtomsCount: skillAtoms.length,
+      checkins: args.checkins,
+      useRealAI: this.useRealAI
+    });
+    
+    const questsCandidate = await this.generateDailyQuests({
+      profile: args.profile,
+      skillAtoms,
+      checkins: args.checkins,
+    });
+    console.log('笞｡ Step 2 Complete: Generated', questsCandidate.length, 'candidate quests');
+
+    console.log('剥 Step 3: Enhanced policy check...');
+    console.log('剥 Step 3 Input:', {
+      candidateQuestsCount: questsCandidate.length,
+      profileTimebudget: args.profile.time_budget_min_per_day,
+      useRealAI: this.useRealAI
+    });
+    
+    const finalQuests = await this.policyCheck({
+      quests: questsCandidate,
+      profile: args.profile,
+      checkins: args.checkins,
+    });
+    console.log('剥 Step 3 Complete: Final', finalQuests.quests.length, 'optimized quests');
+
+    console.log('笨・Quest Generation Pipeline Complete:', {
+      skillAtoms: skillAtoms.length,
+      candidates: questsCandidate.length,
+      finalQuests: finalQuests.quests.length,
+      totalTime: finalQuests.quests.reduce((sum, q) => sum + q.minutes, 0)
+    });
+
+    return {
+      skillAtoms,
+      questsCandidate,
+      finalQuests,
+    };
+  }
+
+  /**
+   * 豎守畑AI逕滓・繝｡繧ｽ繝・ラ - 繧ｫ繧ｹ繧ｿ繝繝励Ο繝ｳ繝励ヨ縺ｧAI逕滓・
+   * 逶ｮ讓呎・遒ｺ諤ｧ讀懷・繧・ワ繧､繝悶Μ繝・ラ雉ｪ蝠冗函謌舌〒菴ｿ逕ｨ
+   */
+  async generateCustom(args: {
+    userGoal: string;
+    timeConstraintMinutes?: number;
+    userPreferences?: { difficulty: string };
+    customPrompt: string;
+    temperature?: number;
+  }): Promise<string> {
+    if (!this.isInitialized()) {
+      throw new Error('AdvancedQuestService not initialized');
+    }
+
+    try {
+      const response = await this.llm!.complete({
+        system: '縺ゅ↑縺溘・蟄ｦ鄙呈髪謠ｴAI繧｢繧ｷ繧ｹ繧ｿ繝ｳ繝医〒縺吶ゆｸ弱∴繧峨ｌ縺溘・繝ｭ繝ｳ繝励ヨ縺ｫ蠕薙▲縺ｦ縲∵ｭ｣遒ｺ縺ｧ譛臥畑縺ｪ蝗樒ｭ斐ｒ譌･譛ｬ隱槭〒謠蝉ｾ帙＠縺ｦ縺上□縺輔＞縲・,
+        prompt: args.customPrompt,
+        temperature: args.temperature || 0.3,

@@ -1,7 +1,10 @@
 /**
- * Milestone Generation Service
+ * Milestone Generation Service - Enhanced with SMART+Backcasting Engine
  * Generates intermediate milestones for long-term goals
+ * 
+ * Phase 2 Enhancement: Integrates MilestoneEngine with SMART criteria and backcasting
  */
+import { MilestoneEngine } from './milestoneEngine';
 
 export interface Milestone {
   id: string;
@@ -31,7 +34,84 @@ export interface FeasibilityAnalysis {
 
 export class MilestoneService {
   /**
-   * Generate milestones for a goal
+   * Enhanced milestone generation using SMART+Backcasting methodology (Phase 2)
+   * Generates high-quality SMART milestones with feasibility validation
+   */
+  async generateEnhancedMilestones(
+    input: MilestoneGenerationInput,
+    options: {
+      weeklyHours?: number;
+      resources?: string[];
+      constraints?: string[];
+      outcomeMetric?: { name: string; target: string };
+    } = {}
+  ): Promise<Milestone[]> {
+    try {
+      const timeframeMonths = this.parseTimeframe(input.timeframe);
+      const horizonWeeks = timeframeMonths * 4;
+      
+      // Build input for MilestoneEngine
+      const engineInput = {
+        goal_text: input.goalText,
+        category: input.goalCategory,
+        outcome_metric: options.outcomeMetric || {
+          name: 'Goal Achievement',
+          target: '100% completion'
+        },
+        weekly_hours: options.weeklyHours || (input.timeBudgetPerDay * 7 / 60),
+        resources: options.resources || [],
+        constraints: options.constraints || [],
+        horizon_weeks: horizonWeeks
+      };
+
+      console.log('🚀 Generating enhanced milestones with SMART+Backcasting:', engineInput);
+
+      // Use MilestoneEngine for generation
+      const milestonePlan = await MilestoneEngine.generateMilestonePlan(engineInput);
+
+      // Convert engine milestones to service format
+      const convertedMilestones: Milestone[] = [];
+      let milestoneId = 1;
+
+      for (const timeframe of ['Now', 'Next', 'Later'] as const) {
+        for (const milestone of milestonePlan.milestones[timeframe]) {
+          const targetDate = new Date();
+          targetDate.setDate(targetDate.getDate() + (milestone.timeframe_weeks * 7));
+
+          convertedMilestones.push({
+            id: `enhanced_milestone_${milestoneId}_${new Date().getTime()}`,
+            title: milestone.title,
+            description: milestone.description,
+            targetDate,
+            isCompleted: false,
+            importance: this.mapImportanceLevel(input.importance),
+            estimatedDifficulty: 1 - milestone.feasibility_score, // Convert feasibility to difficulty
+          });
+          milestoneId++;
+        }
+      }
+
+      // Validate plan quality
+      const validation = MilestoneEngine.validateMilestonePlan(milestonePlan);
+      if (!validation.isValid) {
+        console.warn('⚠️ Milestone plan validation issues:', validation.issues);
+      }
+
+      console.log('✅ Enhanced milestones generated successfully:', {
+        total: convertedMilestones.length,
+        validation: validation.metrics
+      });
+
+      return convertedMilestones;
+
+    } catch (error) {
+      console.error('Enhanced milestone generation failed, falling back to template method:', error);
+      return this.generateMilestones(input);
+    }
+  }
+
+  /**
+   * Generate milestones for a goal (Legacy method)
    * For MVP, uses template-based generation with simple AI enhancement
    */
   async generateMilestones(input: MilestoneGenerationInput): Promise<Milestone[]> {
@@ -62,13 +142,23 @@ export class MilestoneService {
   }
 
   /**
-   * Analyze goal feasibility
+   * Analyze goal feasibility with enhanced constraints, resources, and weekly hours analysis (T-HOTFIX-07)
    */
-  async analyzeFeasibility(goalText: string, timeframe: string, dailyBudget: number): Promise<FeasibilityAnalysis> {
+  async analyzeFeasibility(
+    goalText: string, 
+    timeframe: string, 
+    dailyBudget: number,
+    options: {
+      weeklyHours?: number;
+      resources?: string[];
+      constraints?: string[];
+    } = {}
+  ): Promise<FeasibilityAnalysis> {
     const timeframeMonths = this.parseTimeframe(timeframe);
     const totalHours = (timeframeMonths * 30 * dailyBudget) / 60;
+    const weeklyHours = options.weeklyHours || (dailyBudget * 7 / 60);
     
-    // Simple heuristic-based analysis
+    // Enhanced heuristic-based analysis with T-HOTFIX-07 improvements
     const analysis: FeasibilityAnalysis = {
       isRealistic: true,
       confidence: 0.8,
@@ -103,6 +193,50 @@ export class MilestoneService {
       analysis.riskFactors.push('高度な目標に対して期間が短い可能性があります');
       analysis.recommendations.push('段階的な目標設定を推奨します');
       analysis.confidence = Math.min(analysis.confidence, 0.7);
+    }
+
+    // T-HOTFIX-07: Enhanced analysis with weekly_hours/resources/constraints hints
+    
+    // Weekly hours analysis
+    if (weeklyHours < 3) {
+      analysis.riskFactors.push('週間学習時間が不十分です（目標: 週3時間以上）');
+      analysis.recommendations.push('毎週の学習時間を増やすか、目標を調整してください');
+      analysis.confidence = Math.min(analysis.confidence, 0.5);
+    } else if (weeklyHours > 20) {
+      analysis.riskFactors.push('週間学習時間が過度に多い可能性があります');
+      analysis.recommendations.push('継続可能な学習スケジュールを検討してください');
+      analysis.confidence = Math.min(analysis.confidence, 0.7);
+    }
+
+    // Resources analysis
+    const resources = options.resources || [];
+    if (resources.length === 0 && hasComplexGoal) {
+      analysis.riskFactors.push('高度な目標に対してリソースが不足している可能性があります');
+      analysis.recommendations.push('必要な学習リソース（本、コース、ツールなど）を準備してください');
+      analysis.confidence = Math.min(analysis.confidence, 0.6);
+    } else if (resources.length > 0) {
+      analysis.recommendations.push(`活用可能なリソース: ${resources.slice(0, 3).join(', ')}${resources.length > 3 ? '他' : ''}`);
+    }
+
+    // Constraints analysis
+    const constraints = options.constraints || [];
+    if (constraints.length > 0) {
+      const timeConstraints = constraints.filter(c => 
+        c.toLowerCase().includes('time') || c.includes('時間') || c.includes('忙しい')
+      );
+      const resourceConstraints = constraints.filter(c => 
+        c.toLowerCase().includes('budget') || c.includes('予算') || c.includes('費用')
+      );
+      
+      if (timeConstraints.length > 0) {
+        analysis.riskFactors.push('時間制約により目標達成が困難な可能性があります');
+        analysis.recommendations.push('より効率的な学習方法を選択してください');
+        analysis.confidence = Math.min(analysis.confidence, 0.6);
+      }
+      
+      if (resourceConstraints.length > 0) {
+        analysis.recommendations.push('予算制約を考慮した無料または低コストのリソースを活用してください');
+      }
     }
 
     analysis.isRealistic = analysis.confidence > 0.6;
@@ -149,7 +283,7 @@ export class MilestoneService {
     const progressPercentage = (step / totalSteps) * 100;
     
     return {
-      id: `milestone_${step}_${Date.now()}`,
+      id: `milestone_${step}_${new Date().getTime()}`,
       title: template.title.replace('{goal}', goalText).replace('{progress}', `${progressPercentage.toFixed(0)}%`),
       description: template.description.replace('{goal}', goalText),
       targetDate,

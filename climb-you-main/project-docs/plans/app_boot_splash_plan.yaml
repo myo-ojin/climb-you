@@ -1,0 +1,74 @@
+metadata:
+  title: App Boot & Splash Experience Plan
+  version: 0.1.0
+  created: 2025-09-12
+  owners: ["mobile-core", "design-ux"]
+  intent: "Eliminate white screens at startup and show a friendly boot screen until initialization finishes."
+
+objectives:
+  - "Show native splash immediately with brand visuals (iOS/Android)"
+  - "Display an in-app BootScreen during initialization (language/i18n, Firebase, cache)"
+  - "First-run flow: LanguagePicker -> Onboarding; subsequent boots go straight to Main"
+
+dependencies:
+  - "Expo managed workflow (expo-splash-screen)"
+  - "i18n init (basic en)"
+
+tasks:
+  - id: SP-01_native_splash_assets
+    title: "Native splash assets & app.json tuning"
+    files: [app.json, assets/splash-icon.png, assets/adaptive-icon.png]
+    steps:
+      - "Provide 2048x2048 centered logo with safe margins"
+      - "Set backgroundColor to brand color; resizeMode=contain"
+      - "Android12 splash harmony with adaptive icon foreground/background"
+    acceptance:
+      - "Splash shows instantly with no white gap"
+
+  - id: SP-02_expo_splash_screen
+    title: "expo-splash-screen integration"
+    files: [App.tsx]
+    steps:
+      - "Call SplashScreen.preventAutoHideAsync() before any async init"
+      - "Hide only after init pipeline resolves"
+    acceptance:
+      - "No flash of white/blank while initializing"
+
+  - id: SP-03_boot_screen
+    title: "In-app BootScreen (React)"
+    files: [src/screens/boot/BootScreen.tsx]
+    steps:
+      - "Render logo + brief messages (e.g., Preparing environment / Loading profile)"
+      - "Fallback/offline message when network unavailable"
+    acceptance:
+      - "BootScreen visible until routing decision is ready"
+
+  - id: SP-04_init_pipeline
+    title: "Unified initialization pipeline in App.tsx"
+    files: [App.tsx]
+    steps:
+      - "Order: i18n(lang) -> Firebase(init+anon sign-in) -> cache preload -> Firestore diagnose -> route"
+      - "Parallelize slow ops; cap waiting with reasonable timeout"
+      - "Routing: first-run -> LanguagePicker; else -> Main/Onboarding per saved state"
+    acceptance:
+      - "TTI <= 2s with cached profile; clear logs for route chosen"
+
+  - id: SP-05_metrics_optional
+    title: "Optional: boot metrics"
+    files: [App.tsx]
+    steps:
+      - "Log stage durations (i18n, Firebase, cache) for diagnostics"
+    acceptance:
+      - "Startup logs include per-stage timings"
+
+acceptance_criteria:
+  - "No observable white screen during startup"
+  - "LanguagePicker appears first on fresh installs"
+  - "Cached boots reach Main quickly; offline shows friendly notice"
+
+risks:
+  - "Blocking calls before preventAutoHideAsync -> white flash"
+  - "Excessive init time -> user perceives slow"
+mitigations:
+  - "Move heavy work after splash guard; parallelize and set timeouts"
+

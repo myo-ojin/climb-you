@@ -1,0 +1,113 @@
+{
+  "category": "programming",
+  "examples": [
+    {
+      "id": "prog_quest_1",
+      "goal_text": "Reactでタスク管理アプリを作れるようになりたい",
+      "user_profile": {
+        "learning_level": "beginner",
+        "time_budget_min_per_day": 60,
+        "preferred_study_times": ["evening"]
+      },
+      "generated_quests": [
+        {
+          "title": "React基礎：コンポーネント作成練習",
+          "pattern": "build_micro",
+          "minutes": 30,
+          "difficulty": 0.3,
+          "deliverable": "Hello Worldコンポーネント",
+          "tags": ["react", "component", "jsx"],
+          "done_definition": "Hello Worldを表示するReactコンポーネントを作成し、ブラウザで動作確認する",
+          "evidence": ["動作確認スクリーンショット", "完成したコード"],
+          "alt_plan": "CodePenやCodeSandboxを使って最小限の実装から始める",
+          "stop_rule": "30分経過したら、現在の進捗で一旦終了。エラーが3回以上続いたら別のアプローチを検討。"
+        },
+        {
+          "title": "JSX記法とpropsの理解",
+          "pattern": "read_note_q",
+          "minutes": 30,
+          "difficulty": 0.4,
+          "deliverable": "propsの使い方ノート",
+          "tags": ["react", "jsx", "props"],
+          "done_definition": "propsの使い方ノートを完成させ、内容を説明できる状態になる",
+          "evidence": ["作成したノート", "理解度チェックの結果"],
+          "alt_plan": "重要な箇所のみをピックアップして読む",
+          "stop_rule": "30分経過したら、現在の進捗で一旦終了。理解度が50%未満の場合は基礎に戻る。"
+        }
+      ],
+      "rationale": "初心者レベルなので実践（build_micro）と理論（read_note_q）のバランスを取り、30分ずつで集中できる構成にしました。"
+    },
+    {
+      "id": "prog_quest_2", 
+      "goal_text": "Node.jsでREST APIを開発できるようになりたい",
+      "user_profile": {
+        "learning_level": "intermediate",
+        "time_budget_min_per_day": 90,
+        "preferred_study_times": ["morning"]
+      },
+      "generated_quests": [
+        {
+          "title": "Express.jsでCRUD API実装",
+          "pattern": "build_micro",
+          "minutes": 45,
+          "difficulty": 0.6,
+          "deliverable": "基本的なCRUD API（1リソース）",
+          "tags": ["nodejs", "express", "crud", "api"],
+          "done_definition": "動作する基本的なCRUD APIを完成させ、Postmanでテスト実行する",
+          "evidence": ["動作確認スクリーンショット", "完成したコード"],
+          "alt_plan": "最小限の機能のみ実装する",
+          "stop_rule": "45分経過したら、現在の進捗で一旦終了。エラーが3回以上続いたら別のアプローチを検討。"
+        },
+        {
+          "title": "データベース接続とモデル設計",
+          "pattern": "config_verify",
+          "minutes": 45,
+          "difficulty": 0.5,
+          "deliverable": "DB接続設定とユーザーモデル",
+          "tags": ["database", "mongodb", "mongoose"],
+          "done_definition": "設定を完了し、正常動作を確認する",
+          "evidence": ["設定画面のスクリーンショット", "動作確認結果"],
+          "alt_plan": "必須設定のみを行い、詳細は後日",
+          "stop_rule": "45分経過したら、現在の進捗で一旦終了。理解度が50%未満の場合は基礎に戻る。"
+        }
+      ],
+      "rationale": "中級者レベルなので実践重視で45分ずつの集中セッション。APIとデータベースの両方をカバーして実用的なスキルを身につけます。"
+    },
+    {
+      "id": "prog_quest_3",
+      "goal_text": "Pythonでデータ分析ができるようになりたい",
+      "user_profile": {
+        "learning_level": "beginner",
+        "time_budget_min_per_day": 45,
+        "preferred_study_times": ["lunch", "evening"]
+      },
+      "generated_quests": [
+        {
+          "title": "pandas基礎：CSVデータ読み込み",
+          "pattern": "build_micro",
+          "minutes": 25,
+          "difficulty": 0.3,
+          "deliverable": "データ読み込みと基本統計",
+          "tags": ["python", "pandas", "csv"],
+          "done_definition": "動作するCSVデータ読み込みスクリプトを完成させ、基本統計を表示する",
+          "evidence": ["動作確認スクリーンショット", "完成したコード"],
+          "alt_plan": "最小限の機能のみ実装する", 
+          "stop_rule": "25分経過したら、現在の進捗で一旦終了。エラーが3回以上続いたら別のアプローチを検討。"
+        },
+        {
+          "title": "データ可視化：基本的なグラフ作成",
+          "pattern": "build_micro",
+          "minutes": 20,
+          "difficulty": 0.4,
+          "deliverable": "棒グラフと散布図",
+          "tags": ["python", "matplotlib", "visualization"],
+          "done_definition": "動作する棒グラフと散布図を完成させ、画像保存する",
+          "evidence": ["動作確認スクリーンショット", "完成したコード"],
+          "alt_plan": "最小限の機能のみ実装する",
+          "stop_rule": "20分経過したら、現在の進捗で一旦終了。エラーが3回以上続いたら別のアプローチを検討。"
+        }
+      ],
+      "rationale": "短時間（45分）で実践重視。データ分析の基礎となるデータ読み込みと可視化を体験できる構成です。"
+    }
+  ]
+}

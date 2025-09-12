@@ -33,6 +33,7 @@ export default function TasksScreen() {
         style={[styles.taskItem, item.completed && styles.completedTask]}
         onPress={() => toggleTask(item.id)}
         onLongPress={() => handleDeleteTask(item.id)}
+        activeOpacity={0.8}
       >
         <View style={styles.taskHeader}>
           <View style={[styles.checkbox, item.completed && styles.checkedBox]}>
@@ -50,8 +51,18 @@ export default function TasksScreen() {
           ) : null}
         </View>
         <View style={styles.taskFooter}>
-          <Text style={styles.taskStatus}>
-            {item.completed ? '✅ 完了' : '🎯 進行中'}
+          <View style={styles.taskStatusContainer}>
+            <Text style={[styles.taskStatus, item.completed && styles.taskStatusCompleted]}>
+              {item.completed ? '✅ 完了' : '🎯 進行中'}
+            </Text>
+            {item.completed && (
+              <View style={styles.completedBadge}>
+                <Text style={styles.completedBadgeText}>DONE</Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.taskHint}>
+            {item.completed ? 'お疲れ様でした！' : '長押しで削除'}
           </Text>
         </View>
       </TouchableOpacity>
@@ -268,10 +279,35 @@ const styles = StyleSheet.create({
   taskFooter: {
     alignItems: 'flex-start',
   },
+  taskStatusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   taskStatus: {
     fontSize: 12,
     fontWeight: '500',
     color: '#B9C3CF',
+  },
+  taskStatusCompleted: {
+    color: '#4CAF50',
+  },
+  completedBadge: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  completedBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  taskHint: {
+    fontSize: 10,
+    color: '#999',
+    fontStyle: 'italic',
   },
   completedText: {
     textDecorationLine: 'line-through',

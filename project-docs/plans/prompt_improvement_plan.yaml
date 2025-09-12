@@ -1,0 +1,397 @@
+metadata:
+  title: Prompt Improvement Plan (Profile Questions, Milestones, One-Day Quests)
+  version: 0.1.0
+  created: 2025-09-11
+  owners: ["ai-core", "mobile-ai"]
+  repo_paths:
+    - climb-you-main/src/services/ai/promptEngine.ts
+    - climb-you-main/src/services/ai/advancedQuestService.fixed.ts
+    - climb-you-main/src/services/ai/enhancedQuestService.ts
+    - climb-you-main/src/services/ai/dailyQuestService.ts
+    - climb-you-main/src/services/ai/hybridQuestionService.ts
+    - climb-you-main/src/services/ai/goalClarificationService.ts
+    - climb-you-main/src/services/ai/openaiService.ts
+    - climb-you-main/src/types/onboardingQuestions.ts
+    - climb-you-main/src/types/questGeneration.ts
+
+goals:
+  - Reduce off-topic profile questions while minimizing user fatigue.
+  - Generate SMART milestones aligned to user goals with feasibility checks.
+  - Ensure one-day quests finish within the day (<= 3 tasks, <= 45 min each).
+
+scope:
+  profile_questions: true
+  milestones: true
+  daily_quests: true
+
+current_state:
+  modules:
+    - name: promptEngine
+      path: src/services/ai/promptEngine.ts
+      notes: Core schemas (Profile/Derived/Quest/Constraints) and prompt builders.
+    - name: advancedQuestService
+      path: src/services/ai/advancedQuestService.fixed.ts
+      notes: Orchestrates skill map / quests / policy check (mock/real AI).
+    - name: enhancedQuestService
+      path: src/services/ai/enhancedQuestService.ts
+      notes: Time adjustment, difficulty balance, pattern diversity.
+    - name: dailyQuestService
+      path: src/services/ai/dailyQuestService.ts
+      notes: Per-day generation with history adaptation (has arg mismatch risk).
+    - name: hybridQuestionService
+      path: src/services/ai/hybridQuestionService.ts
+      notes: Hybrid A/C AI generation, B/D template.
+    - name: goalClarificationService
+      path: src/services/ai/goalClarificationService.ts
+      notes: Vague goal detection and clarification loop.
+  risks:
+    - duplicate_schemas_between_promptEngine_and_types: true
+    - ai_calls_mock_default: true
+    - japanese_text_regexp_fragile: true
+
+top15_improvements:
+  - id: P1
+    area: profile
+    title: Information-gain driven question gating
+    rule: "ask_if score = relevance*info_gain - 0.5*fatigue >= 0.25"
+    outputs: [questions, skipped, budget]
+    metrics: { offtopic_rate: "<=0.10", avg_questions: "<=5" }
+    files: [src/services/ai/profileQuestionEngine.ts]
+  - id: P2
+    area: profile
+    title: Goal taxonomy routing
+    details: "route by goal_category/domain -> applicable_when rules"
+    files: [src/services/ai/questionBank.ts]
+  - id: P3
+    area: profile
+    title: Known info confirm mode (y/n)
+    details: "if known.confidence>=0.7 then confirm_yes_no"
+  - id: P4
+    area: profile
+    title: Budgeted flow (5 + optional 3)
+    details: "initial budget=5; refine_mode +3"
+  - id: P5
+    area: profile
+    title: MCQ then short freeform
+    details: "stage1 MCQ, stage2 1-2 freeform"
+  - id: M1
+    area: milestone
+    title: SMART + Now/Next/Later backcasting
+    details: "group milestones and include KPI, evidence, dependencies"
+    files: [src/services/ai/milestoneEngine.ts]
+  - id: M2
+    area: milestone
+    title: Outcome->intermediate->behavior KPI chain
+  - id: M3
+    area: milestone
+    title: Feasibility/risk check and revise
+    details: "ensure feasibility>=0.8 else revise once"
+  - id: M4
+    area: milestone
+    title: Collect weekly_hours/resources/constraints in profile
+    files: [src/services/ai/promptEngine.ts]
+  - id: Q1
+    area: quest
+    title: One-day template (<=3 x <=45min) with done/evidence
+    files: [src/services/ai/promptEngine.ts]
+  - id: Q2
+    area: quest
+    title: Day type adaptation (busy/normal/deep)
+    files: [src/services/ai/enhancedQuestService.ts]
+  - id: Q3
+    area: quest
+    title: Success_check and stop_rule per quest
+  - id: Q4
+    area: quest
+    title: Alternative plan (A/B) + reschedule hint
+  - id: A1
+    area: all
+    title: Self-critique and selective revise loop
+  - id: A2
+    area: all
+    title: Few-shot RAG (3 exemplars) by category
+    files: [src/services/ai/fewshots/*.json, src/services/ai/retriever.ts]
+
+specs:
+  profile_question_engine:
+    system: "You are a goal-aligned profiler that maximizes information gain while minimizing fatigue."
+    input:
+      goal_text: string
+      known_profile:
+        fields: object
+        confidence: map[string, number]
+      question_bank: list
+      budget:
+        max_questions: 5
+        allow_refine: true
+    rules:
+      - "score = relevance*info_gain - 0.5*fatigue"
+      - "ask only if score>=0.25"
+      - "if confidence>=0.7 -> confirm_yes_no"
+      - "stage1 MCQ -> stage2 1-2 freeform"
+    output:
+      questions: list
+      skipped: list
+      budget: { used: number, remaining: number }
+
+  milestone_engine:
+    system: "You are a planner generating SMART milestones via backcasting."
+    input:
+      goal_text: string
+      category: [learning, career, health, skill, creative, other]
+      outcome_metric: { name: string, target: string }
+      weekly_hours: number
+      resources: list[string]
+      constraints: list[string]
+      horizon_weeks: number
+    rules:
+      - "backcast outcome -> intermediate_KPI -> behavior_KPI"
+      - "group by Now(1-2w), Next(3-6w), Later(>6w)"
+      - "include KPI, evidence, resources, dependencies, risk_flags, feasibility"
+      - "if feasibility<0.8 -> one revision"
+    output:
+      milestones:
+        Now: list
+        Next: list
+        Later: list
+      rationale: list[string]
+
+  one_day_quest_builder:
+    system: "You are a day-planner that returns only one-day quests."
+    input:
+      profile: ProfileV1
+      derived: { daily_capacity_min: number, quest_count_hint: number, novelty_ratio: number }
+      skill_atoms: list[SkillAtom]
+      checkins: { day_type: [busy, normal, deep], available_time_today_delta_min: number }
+      constraints: { total_minutes_max: number, session_length: number, avoid_consecutive_same_pattern: boolean }
+    rules:
+      - "return 2-3 quests, each <=45min; total <= total_minutes_max"
+      - "adapt total time and difficulty by day_type: busy=45, normal=90, deep=150"
+      - "avoid consecutive identical patterns"
+      - "include done_definition, evidence, alt_plan, stop_rule"
+      - "self-critique: relevance>=0.85, feasibility>=0.8, specificity>=0.85, load_over=0%"
+    output:
+      quests: list[Quest]
+      rationale: list[string]
+
+  pre_goal_analysis:
+    system: |-
+      あなたは目標分解と計画設計に特化したアナリストです。
+      入力された目標を、測定可能なKPI・バックキャスト（中間→行動）・前提スキル・1日で踏み出す最小プランに分解し、
+      不確実な領域を明らかにして「次に聞くべき質問候補」を情報利得順で提案してください。
+
+      厳守事項:
+      - JSONのみを出力（前後の説明テキストは禁止）。
+      - 値は具体的・測定可能に。曖昧語は避ける。
+      - 既知の時間/資源/制約を尊重。実行不可な案は出さない。
+      - 安全領域外（医療/法務/投資）は一般情報+専門家相談ディスクレーマを risk_triage.notes に含める。
+      - 自己採点(rubric_scores)で不足があれば、revise_note に改善要点を記す（再出力は不要）。
+    input:
+      goal_text: string
+      timeframe_hint: "1m|3m|6m|12m+|YYYY-MM-DD|null"
+      known_profile:
+        fields: object   # { time_budget_min_per_day?, weekly_hours?, peak_hours?, env_constraints?, resources?, constraints? }
+        confidence: "map[string, number]"
+    return_format:
+      json_only: true
+    output_schema:
+      normalized_goal: string
+      classification:
+        domain: [language, programming, business, creative, academic, fitness, general]
+        subdomain: string
+        learning_type: [knowledge, skill, habit, outcome]
+        complexity: [beginner, intermediate, advanced]
+        horizon_weeks: number
+      outcome_metric:
+        name: string
+        target: "string|number"
+        unit: "string|null"
+        baseline: "string|number|null"
+        deadline: "YYYY-MM-DD|null"
+      backcast:
+        outcome:
+          kpi: string
+          why: string
+        intermediate:
+          - kpi: string
+            why: string
+            confidence: number
+        behavior:
+          - kpi: string
+            cadence: string
+            estimate_min_per_week: number
+      prerequisites:
+        - id: string
+          label: string
+          type: [concept, procedure, habit]
+          why: string
+      first_day_seed:
+        total_minutes_max: 90
+        quests:
+          - title: string
+            pattern: [read_note_q, flashcards, build_micro, config_verify, debug_explain, feynman, past_paper, socratic, shadowing, retrospective]
+            minutes: number
+            difficulty: number
+            deliverable: string
+            steps: [string, string, string]
+            done_definition: string
+            evidence: [string]
+            alt_plan: string
+            stop_rule: string
+            tags: [string]
+      risk_triage:
+        overload: boolean
+        dependency: boolean
+        uncertainty: boolean
+        notes: [string]
+      question_hints:
+        - dataKey: [novelty_preference, review_cadence, goal_evidence, capstone_type, scope_style, goal_focus, difficulty_bias]
+          question: string
+          reason: string
+          info_gain_est: number
+          depends_on: "string|null"
+      confidence:
+        classification: number
+        outcome_metric: number
+        backcast: number
+      rubric_scores:
+        relevance: number
+        feasibility: number
+        specificity: number
+        load_fit: number
+      revise_note: "string|null"
+    generation_rules:
+      - "outcome_metric には name/target/unit/deadline を可能な限り含める"
+      - "intermediate は2–4件、behavior は3–6件"
+      - "first_day_seed は2–3クエスト、各<=45分、合計<=90分"
+      - "各クエストに done_definition/evidence/alt_plan/stop_rule を必須"
+      - "question_hints の dataKey は onboardingQuestions.ts の定義に一致させる"
+      - "医療/法務/投資などは risk_triage.notes にディスクレーマを追加"
+      - "出力は厳密にJSONのみ"
+    rubric_thresholds:
+      relevance: ">=0.85"
+      feasibility: ">=0.80"
+      specificity: ">=0.85"
+      load_fit: "==1.0"
+    fewshot:
+      retrieval: "optional: ゴールカテゴリに応じて最大3件の短い例を注入"
+      max_tokens_each: 200
+    parameters:
+      temperature: 0.3
+      top_p: 1.0
+      max_tokens: 1800
+      presence_penalty: 0.0
+      frequency_penalty: 0.0
+    fallback:
+      offline_rule_based: true
+      strategies:
+        - "キーワード辞書でdomain分類"
+        - "ドメイン既定の outcome_metric を付与"
+        - "テンプレの first_day_seed（2–3件）を生成"
+        - "novelty/review/evidence/capstone の固定 question_hints を提示"
+    integration:
+      cache_key: "hash(goal_text)"
+      consumers:
+        - "profile_question_engine.question_hints"
+        - "milestone_engine (classification/outcome_metric/backcast/prerequisites)"
+        - "one_day_quest_builder.first_day_seed"
+      trigger: "Onboarding goal input -> Next button (async)"
+
+schema_changes:
+  ProfileV1_additions:
+    - weekly_hours?: number
+    - resources?: string[]
+    - constraints?: string[]
+  DailyCheckins_additions:
+    - day_type?: ["busy", "normal", "deep"]
+  QuestSchema_additions:
+    - done_definition?: string
+    - evidence?: string[]
+    - alt_plan?: string
+    - stop_rule?: string
+  onboarding_questions_additions:
+    question:
+      - applicable_when?: string
+      - info_gain_hint?: number
+    answer:
+      - confidence?: number
+  new_schemas:
+    - MilestonePlanSchema
+    - ProfileQuestionPlanSchema
+
+tasks:
+  - phase: 0
+    name: Types & prompt separation
+    steps:
+      - update promptEngine schemas and daily quests prompt
+      - add openaiService.complete/completeJson wrappers (optional)
+  - phase: 1
+    name: Profile Question Engine
+    steps:
+      - add questionBank with applicable_when
+      - implement profileQuestionEngine (scoring/gating)
+      - route hybridQuestionService to engine (A/C AI, B/D template)
+  - phase: 2
+    name: Milestone Engine
+    steps:
+      - implement milestoneEngine with backcast + feasibility
+      - refactor milestoneService as thin wrapper
+  - phase: 3
+    name: One-Day Quest Guarantees
+    steps:
+      - apply day_type scaling and time snap in enhancedQuestService
+      - require done/evidence/alt/stop in policyCheck prompt
+  - phase: 4
+    name: Few-shot RAG
+    steps:
+      - add fewshots json and retriever (3 exemplars)
+
+acceptance_criteria:
+  profile:
+    offtopic_rate: "<= 10%"
+    avg_questions: "<= 5"
+    reask_rate: "<= 15%"
+  milestones:
+    smart_validity: ">= 0.85"
+    feasibility: ">= 0.8"
+    temporal_consistency: "100%"
+  quests:
+    same_day_completion_rate: ">= 75%"
+    time_budget_overage: "0%"
+    required_fields_present: [done_definition, evidence, alt_plan, stop_rule]
+
+rollout:
+  - phase: 0
+    description: Backward-compatible schema updates
+  - phase: 1
+    description: A/B enable profile engine; monitor offtopic_rate
+  - phase: 2
+    description: Enable milestone engine with feasibility loop
+  - phase: 3
+    description: Enforce one-day constraints and alt/stop rules
+  - phase: 4
+    description: Inject few-shot RAG and tune temperatures/thresholds
+
+risks:
+  - name: Schema duplication
+    mitigation: Consolidate definitions into promptEngine and reference from types
+  - name: Regex on Japanese text
+    mitigation: Avoid language-specific regex; use tags/keys
+  - name: AI API variability
+    mitigation: Mock-first; self-critique revision; policy check
+
+metrics_logging:
+  fields:
+    - question_count
+    - offtopic_rate
+    - quest_total_minutes
+    - day_type
+    - diversity_changes
+    - feasibility_score
+  sink: console | analytics
+
+estimates:
+  phase_0_1_days: 2.0
+  phase_2_days: 1.5
+  phase_3_days: 1.0
+  phase_4_days: 0.5

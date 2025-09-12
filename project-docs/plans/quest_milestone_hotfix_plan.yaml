@@ -1,0 +1,246 @@
+metadata:
+  title: Quest & Milestone Hotfix Plan (Non-breaking)
+  version: 0.1.0
+  created: 2025-09-12
+  owners: ["mobile-core", "ai-core", "qa"]
+  intent: "Stabilize quest and milestone generation with minimal, backward-compatible changes while preserving the long-term redesign plan."
+
+context:
+  current_pain:
+    - "Daily quest generation intermittently fails or produces misfit plans."
+    - "Milestones feel generic; weak alignment to user goals/time/resources."
+  design_constraints:
+    - "Do not break current screens, routes, or data readers."
+    - "Prefer optional schema additions over breaking changes."
+    - "Keep AI/Mock switch behavior intact."
+
+problems:
+  - id: P1_api_signature_mismatch
+    title: "API mismatch: dailyQuestService -> enhancedQuestService"
+    description: "Caller passes undefined args (timeBudgetMinutes, questCount, difficultyRange, avoidRecentPatterns) to generateOptimizedQuestsWithTimeConstraints."
+    impact: "Runtime errors or ignored args; daily generation may fail."
+    files:
+      - src/services/ai/dailyQuestService.ts
+      - src/services/ai/enhancedQuestService.ts
+    current_behavior: "Call site sends extra fields not present in callee signature."
+    expected_behavior: "Call uses only the callee's supported fields and lets service compute internals."
+
+  - id: P2_missing_daytype_adaptation
+    title: "Missing DayType adaptation"
+    description: "No busy/normal/deep handling; cannot scale total minutes by day type."
+    impact: "Over/under time budget; lower completion rate."
+    files:
+      - src/services/ai/promptEngine.ts
+      - src/services/ai/enhancedQuestService.ts
+    current_behavior: "DailyCheckins lacks day_type; enhanced service doesn't scale target time."
+    expected_behavior: "Optional day_type guides total time cap (45/90/150)."
+
+  - id: P3_quest_schema_missing_completion_fields
+    title: "Quest schema lacks completion guardrails"
+    description: "No done_definition/evidence/alt_plan/stop_rule to ensure same-day finish."
+    impact: "Ambiguous end state; no fallback; lower perceived quality."
+    files:
+      - src/services/ai/promptEngine.ts
+    current_behavior: "QuestSchema lacks these fields."
+    expected_behavior: "Fields exist (optional) and are auto-filled if missing."
+
+  - id: P4_env_constraints_not_enforced_early
+    title: "Environment constraints applied only via LLM policy"
+    description: "No deterministic substitution (e.g., no-voice -> avoid shadowing)."
+    impact: "Infeasible patterns may survive policy check."
+    files:
+      - src/services/ai/enhancedQuestService.ts
+    expected_behavior: "Pre-policy deterministic pattern substitution by constraint map."
+
+  - id: P5_deliverable_extraction_language_coupling
+    title: "Deliverable extraction tied to Japanese regex/garbled text"
+    description: "Regex relies on JP terms; risk of mismatch and garbling."
+    impact: "Empty/incorrect deliverables."
+    files:
+      - src/services/ai/advancedQuestService.fixed.ts
+    expected_behavior: "Fallback to tags/templates; neutral English artifact name when uncertain."
+
+  - id: P6_policycheck_scope_overlap
+    title: "PolicyCheck vs enhanced adjustments overlap"
+    description: "Both adjust time/diversity; responsibilities blur."
+    impact: "Oscillating outputs; brittle tuning."
+    files:
+      - src/services/ai/promptEngine.ts
+      - src/services/ai/enhancedQuestService.ts
+    expected_behavior: "PolicyCheck focuses on constraints + missing fields; final time scaling in enhanced service."
+
+  - id: P7_milestones_templated_no_backcast
+    title: "Milestones templated; no backcast/KPI fragments"
+    description: "Titles/descriptions not tethered to measurable steps."
+    impact: "Low goal-fit; weak guidance."
+    files:
+      - src/services/ai/milestoneService.ts
+    expected_behavior: "Inject minimal backcast fragments and SMART hints without breaking API."
+
+fixes:
+  - for: P1_api_signature_mismatch
+    change:
+      - "Remove extra args at call site in dailyQuestService; rely on enhanced service internals to compute questCount/time."
+    compatibility: non_breaking
+    validation: "Daily generation runs without exceptions; quests >= 1."
+
+  - for: P2_missing_daytype_adaptation
+    change:
+      - "Add optional day_type to DailyCheckins in promptEngine (types only)."
+      - "In enhancedQuestService, scale target total minutes by day_type (busy=45, normal=90, deep=150; default=normal)."
+      - "Run preAdjustQuestTimes against scaled cap."
+    compatibility: non_breaking_optional_fields
+    validation: "busy<=45, normal<=90, deep<=150 total minutes."
+
+  - for: P3_quest_schema_missing_completion_fields
+    change:
+      - "Add optional fields to QuestSchema: done_definition, evidence[], alt_plan, stop_rule."
+      - "During final pass, auto-fill sensible defaults if missing (e.g., evidence=[\"screenshot\"], stop_rule=\"Switch to alt after 10 min stuck\")."
+      - "PolicyCheck prompt instructs to include these when absent."
+    compatibility: non_breaking_optional_fields
+    validation: "All quests include the 4 fields (non-empty)."
+
+  - for: P4_env_constraints_not_enforced_early
+    change:
+      - "Define a deterministic substitution map in enhancedQuestService (e.g., shadowing->read_note_q/build_micro when 'no_audio')."
+      - "Apply before PolicyCheck; PolicyCheck verifies only."
+    compatibility: non_breaking
+    validation: "No infeasible patterns remain when constraints present."
+
+  - for: P5_deliverable_extraction_language_coupling
+    change:
+      - "Prefer deliverable from template/tags; else fallback to 'artifact' (English)."
+      - "Avoid language-specific regex."
+    compatibility: non_breaking
+    validation: "Every quest has a deliverable string."
+
+  - for: P6_policycheck_scope_overlap
+    change:
+      - "Limit PolicyCheck to (a) constraint validation, (b) consecutive pattern avoidance, (c) fill missing fields."
+      - "Keep final time scaling solely in enhanced service."
+    compatibility: non_breaking
+    validation: "Post-enhanced outputs still satisfy PolicyCheck; no oscillation."
+
+  - for: P7_milestones_templated_no_backcast
+    change:
+      - "Add mini backcast function in milestoneService (outcome->intermediate->behavior array)."
+      - "Inject KPI fragments into titles/descriptions; keep existing API/shape."
+      - "Strengthen analyzeFeasibility with weekly_hours/resources/constraints hints (no API change)."
+    compatibility: non_breaking
+    validation: "Milestones include measurable hints and chronological consistency."
+
+tasks:
+  - id: T-HOTFIX-01
+    for: P1_api_signature_mismatch
+    owners: [mobile-core]
+    estimate_days: 0.25
+    steps:
+      - "Edit dailyQuestService: remove extra args at call site"
+      - "Smoke: generate for today and arbitrary date"
+    risks: ["Hidden downstream reliance on removed args"]
+    rollback: "Revert commit; add guards to ignore unknown options"
+
+  - id: T-HOTFIX-02
+    for: P2_missing_daytype_adaptation
+    owners: [ai-core, mobile-core]
+    estimate_days: 0.5
+    steps:
+      - "Add optional day_type to DailyCheckins type"
+      - "Scale caps in enhancedQuestService and pass cap to preAdjustQuestTimes"
+      - "Unit/Smoke test busy/normal/deep"
+    risks: ["Legacy tests expecting fixed totals"]
+    rollback: "Feature flag to disable day_type scaling"
+
+  - id: T-HOTFIX-03
+    for: P3_quest_schema_missing_completion_fields
+    owners: [ai-core]
+    estimate_days: 0.5
+    steps:
+      - "Extend QuestSchema (optional fields)"
+      - "Auto-fill defaults during final pass"
+      - "Tighten PolicyCheck prompt to ensure presence"
+    risks: ["UI not rendering new fields (but optional)"]
+    rollback: "Disable auto-fill; keep schema optional only"
+
+  - id: T-HOTFIX-04
+    for: P4_env_constraints_not_enforced_early
+    owners: [ai-core]
+    estimate_days: 0.25
+    steps:
+      - "Add substitution map (constraint->pattern alt)"
+      - "Apply before PolicyCheck"
+    risks: ["Overzealous substitution"]
+    rollback: "Feature flag to bypass substitution"
+
+  - id: T-HOTFIX-05
+    for: P5_deliverable_extraction_language_coupling
+    owners: [ai-core]
+    estimate_days: 0.25
+    steps:
+      - "Replace regex extraction with tag/template preference"
+      - "Default to 'artifact' when absent"
+    risks: ["Loss of descriptive deliverables in some cases"]
+    rollback: "Reintroduce regex as secondary path"
+
+  - id: T-HOTFIX-06
+    for: P6_policycheck_scope_overlap
+    owners: [ai-core]
+    estimate_days: 0.25
+    steps:
+      - "Constrain policy prompt scope per plan"
+      - "Verify enhanced finalization preserves constraints"
+    risks: ["Slight quality dip in LLM-corrected timings"]
+    rollback: "Relax scope while keeping final time in enhanced"
+
+  - id: T-HOTFIX-07
+    for: P7_milestones_templated_no_backcast
+    owners: [ai-core]
+    estimate_days: 1.0
+    steps:
+      - "Implement mini backcast function"
+      - "Inject KPI fragments into templates"
+      - "Tune analyzeFeasibility to use weekly_hours/resources/constraints"
+    risks: ["String growth breaking layout in some UIs"]
+    rollback: "Guard long strings; limit injection length"
+
+tests:
+  - name: quest_time_budget
+    checks:
+      - "Total minutes <= cap by day_type"
+      - "Each quest minutes <= 45"
+  - name: quest_fields_presence
+    checks:
+      - "done_definition/evidence/alt_plan/stop_rule exist and non-empty"
+  - name: pattern_diversity
+    checks:
+      - "No consecutive identical patterns"
+  - name: milestone_smart_hints
+    checks:
+      - "KPI fragments present; dates monotonic"
+
+acceptance_criteria:
+  - "Daily quest generation completes without exceptions for typical inputs."
+  - "busy/normal/deep caps respected (45/90/150)."
+  - "All quests include completion guardrail fields."
+  - "No infeasible patterns remain after env constraints."
+  - "Milestones show measurable hints and Now/Next/Later consistency."
+
+timeline:
+  sequence:
+    - T-HOTFIX-01
+    - T-HOTFIX-02
+    - T-HOTFIX-03
+    - T-HOTFIX-04
+    - T-HOTFIX-05
+    - T-HOTFIX-06
+    - T-HOTFIX-07
+
+status:
+  T-HOTFIX-01: pending
+  T-HOTFIX-02: pending
+  T-HOTFIX-03: pending
+  T-HOTFIX-04: pending
+  T-HOTFIX-05: pending
+  T-HOTFIX-06: pending
+  T-HOTFIX-07: pending
+

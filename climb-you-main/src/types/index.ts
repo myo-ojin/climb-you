@@ -20,5 +20,6 @@ export type RootStackParamList = {
   Tasks: undefined;
   AddTask: undefined;
   Profile: undefined;
+  History: undefined;
   Settings: undefined;
 };

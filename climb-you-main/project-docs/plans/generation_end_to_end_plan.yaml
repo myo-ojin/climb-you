@@ -1,0 +1,153 @@
+metadata:
+  title: Quest & Milestone End-to-End Generation Plan
+  version: 0.1.0
+  created: 2025-09-12
+  owners: ["ai-core", "mobile-core", "qa", "design-ux"]
+  intent: "Generate varied, same-day-completable quests and SMART milestones; persist and reuse data for next-day generation; keep UX friendly and i18n-ready (MVP: en)."
+
+objectives:
+  - "Always produce >= 3 quests; each quest <= 45 min; total time cap per DayType"
+  - "Milestones with measurable KPI fragments and Now/Next/Later grouping"
+  - "Persist onboarding/quests/progress; reuse history for next-day generation"
+  - "Friendly tone; i18n staged (en -> ja -> others)"
+
+current_gaps:
+  - "AI path disabled (mock fixed templates)"
+  - "Daily generator not wired into UI/DB loop"
+  - "Firestore services duplicated; path bugs (users/{uid} as collection)"
+  - "Completion -> learning pattern -> next-day generation not connected"
+
+phases:
+  - id: P0
+    name: Unblockers (config + data layer)
+    tasks:
+      - id: PR1_firestore_unify
+        title: "Unify Firestore service & correct document paths"
+        files: [src/services/firebase/firestoreService.ts, src/services/firebase/firestore.ts, src/services/firebase/firebaseUserProfileService.ts]
+        summary: "Treat users/{uid} as document; subcollections under it; remove empty docId usage; pick one service and refactor callers"
+      - id: PR2_demo_write_policy
+        title: "Never skip persistence in demo"
+        files: [src/config/environmentConfig.ts, src/config/apiKeys.ts, README.md]
+        summary: "Demo->emulator if available, else local fallback; add FIREBASE_WRITE_ENABLED flag"
+      - id: CFG_ai_switch
+        title: "Enable AI mode when keys present"
+        files: [.env, src/config/apiKeys.ts]
+        summary: "ENABLE_AI_FEATURES=true, USE_MOCK_AI=false; robust mock fallback"
+
+  - id: P1
+    name: Stable Generation (quests/milestones)
+    tasks:
+      - id: HF1_call_fix
+        title: "Fix call signature: dailyQuestService -> enhancedQuestService"
+        summary: "Remove unsupported args; use {goalText, profile, checkins} only"
+      - id: HF2_daytype_caps
+        title: "Add DayType caps (busy=45/normal=90/deep=150)"
+        files: [src/services/ai/promptEngine.ts, src/services/ai/enhancedQuestService.ts]
+      - id: HF3_guardrails
+        title: "Ensure done_definition/evidence/alt_plan/stop_rule"
+        files: [src/services/ai/promptEngine.ts, src/services/ai/enhancedQuestService.ts]
+        summary: "Schema optional fields + auto-fill defaults if missing"
+      - id: HF4_env_substitution
+        title: "Deterministic substitutions for env constraints"
+        files: [src/services/ai/enhancedQuestService.ts]
+      - id: HF5_mock_diversify
+        title: "Diversify mock templates via SkillAtom mapping + shuffle + avoid duplicates"
+        files: [src/services/ai/advancedQuestService.fixed.ts]
+      - id: HF6_mini_backcast
+        title: "Milestone mini backcast (KPI fragments)"
+        files: [src/services/ai/milestoneService.ts]
+      - id: HF7_policy_scope
+        title: "Limit PolicyCheck scope to constraints/missing fields; timing in enhanced"
+        files: [src/services/ai/promptEngine.ts, src/services/ai/enhancedQuestService.ts]
+
+  - id: P2
+    name: Data Loop + UI wiring
+    tasks:
+      - id: PR3_onboarding_persist
+        title: "Persist onboarding result regardless of mode"
+        files: [src/services/firebase/firebaseUserProfileService.ts]
+        summary: "users/{uid} -> goals -> refs -> quests -> progress; local fallback on error"
+      - id: PR4_completion_nextday
+        title: "Completion -> learning pattern -> next-day generation"
+        files: [src/services/ai/dailyQuestService.ts, src/services/firebase/firebaseUserProfileService.ts]
+        summary: "Record completion; update progress & pattern; fetch recent DB history for next day"
+      - id: UI1_todays_quests
+        title: "UI shows 'today’s quests' from generator; allow regenerate/complete"
+        files: [src/screens/MainScreen.tsx, src/screens/TasksScreen.tsx]
+        summary: "Replace manual-only TaskContext with generated quests or clearly separate modes"
+
+  - id: P3
+    name: Intelligence + Tone/i18n
+    tasks:
+      - id: INT1_pre_goal_stub
+        title: "Pre-Goal analysis stub (goal -> KPI/backcast/first-day seed/question_hints)"
+        files: [src/services/ai]
+      - id: INT2_engines
+        title: "Profile/Milestone/One‑Day engines wired with locale"
+        files: [src/services/ai]
+      - id: TONE_locale
+        title: "PromptLocalePacks + Tone Rewriter (en first, then ja)"
+        files: [src/services/ai/promptPacks, assets/i18n/tone]
+
+  - id: P4
+    name: Observability + Tests
+    tasks:
+      - id: OBS1_metrics
+        title: "Generation metrics + startup diagnosis logs"
+        files: [src/services/ai, App.tsx]
+      - id: TEST_smoke
+        title: "Smoke tests: time caps, required fields, pattern diversity, SMART hints, DB loop"
+        files: [scripts/test_*]
+
+acceptance_criteria:
+  - "Quests always produced (>=3); each quest <= 45 min; total cap honored by DayType"
+  - "Every quest includes done_definition/evidence/alt_plan/stop_rule"
+  - "No infeasible patterns when env_constraints present"
+  - "Milestones contain KPI fragments; Now/Next/Later chronological consistency"
+  - "Onboarding + completion data persisted (DB or local); reload works"
+  - "Next-day quests adjust based on prior completions"
+  - "AI mode (with key) yields varied, schema-valid outputs; mock diversified when AI off"
+
+metrics:
+  - total_minutes
+  - quest_count
+  - constraint_violations
+  - pattern_consecutive_count
+  - completion_rate
+  - generation_duration_ms
+
+risks:
+  - "Legacy expectations around exactly 3 quests"
+  - "Data duplication (local vs DB)"
+  - "Long milestone titles after KPI injection"
+mitigations:
+  - "Keep questCount hint=3 by default; tests updated"
+  - "Upsert keys (progress_YYYY‑MM‑DD, questId); clear logs"
+  - "UI truncate/ellipsis safe"
+
+rollout:
+  - "Week 1: P0 + P1 (HF1..HF5)"
+  - "Week 2: P2 (PR3/PR4 + UI1) + HF6/HF7"
+  - "Week 3: P3 partial (INT1, TONE en)"
+  - "Week 4: P4 tests/metrics; prepare ja"
+
+status:
+  PR1_firestore_unify: pending
+  PR2_demo_write_policy: pending
+  CFG_ai_switch: pending
+  HF1_call_fix: pending
+  HF2_daytype_caps: pending
+  HF3_guardrails: pending
+  HF4_env_substitution: pending
+  HF5_mock_diversify: pending
+  HF6_mini_backcast: pending
+  HF7_policy_scope: pending
+  PR3_onboarding_persist: pending
+  PR4_completion_nextday: pending
+  UI1_todays_quests: pending
+  INT1_pre_goal_stub: pending
+  INT2_engines: pending
+  TONE_locale: pending
+  OBS1_metrics: pending
+  TEST_smoke: pending
+

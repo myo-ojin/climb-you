@@ -1,0 +1,128 @@
+metadata:
+  title: MVP Release Readiness Plan
+  version: 0.1.0
+  created: 2025-09-11
+  owners: ["mobile-core", "ai-core"]
+
+summary:
+  objective: "Ship a stable demo-capable MVP with onboarding -> profile -> quests -> local persistence."
+  constraints:
+    - "Network access may be unavailable; AI should gracefully fallback."
+    - "Firebase may run in demo/emulator mode."
+
+must_fix:
+  - id: MF-android-package-id
+    description: "Android package name must be lowercase."
+    file: climb-you-main/app.json
+    current: "com.climbYou.main"
+    required: "com.climbyou.main"
+    validation: "Android build config passes; no runtime crash on start."
+
+  - id: MF-expo-deps-alignment
+    description: "Align dependencies to Expo SDK 54 recommendations."
+    files:
+      - climb-you-main/package.json
+    actions:
+      - "Run: npx expo install (to resolve compatible versions)."
+      - "Run: npx expo-doctor and address reported issues."
+    validation: "App boots on Expo Go (iOS/Android/Web)."
+
+  - id: MF-service-signature-mismatch
+    description: "Fix argument mismatch between dailyQuestService and enhancedQuestService."
+    caller: src/services/ai/dailyQuestService.ts
+    callee: src/services/ai/enhancedQuestService.ts
+    problem: "Passing timeBudgetMinutes/questCount/difficultyRange/avoidRecentPatterns which are not defined in callee signature."
+    options:
+      - "A) Add these fields to EnhancedQuestService.generateOptimizedQuestsWithTimeConstraints signature and implement."
+      - "B) Remove extra args at call site; compute from profile+derived instead."
+    chosen: "B (faster for MVP)"
+    validation: "tsc passes; generation runs without runtime errors."
+
+  - id: MF-schema-duplication-check
+    description: "Ensure no conflicting type/scheme duplication between promptEngine.ts and types/questGeneration.ts."
+    actions:
+      - "Prefer promptEngine.ts as source of truth for Quest/Profile/DailyCheckins."
+      - "Where duplication exists, re-export types and remove redundant local copies."
+    validation: "tsc --noEmit passes; single source definitions."
+
+should_do:
+  - id: SD-demo-env-defaults
+    description: "Document .env demo defaults so app runs without keys."
+    file: climb-you-main/.env.example
+    add:
+      EXPO_PUBLIC_DEMO_MODE: "true"
+      EXPO_PUBLIC_USE_MOCK_AI: "true"
+      EXPO_PUBLIC_ENABLE_AI_FEATURES: "false"
+      EXPO_PUBLIC_FIREBASE_USE_EMULATOR: "true"
+    validation: "App boots and completes onboarding in demo mode."
+
+  - id: SD-openai-fallback-ux
+    description: "When AI key missing or request fails, keep static options and show subtle toast/log."
+    file: src/screens/onboarding/ProfileQuestionsScreen.tsx
+    validation: "User can proceed with static options."
+
+  - id: SD-regex-hardening
+    description: "Avoid Japanese-text regex for deliverable detection; prefer keyword lists or tags."
+    files:
+      - src/services/ai/advancedQuestService.fixed.ts
+    validation: "No runtime exceptions from regex; deliverable populated."
+
+  - id: SD-readme-cd-path
+    description: "Clarify double-folder structure and entry commands."
+    file: climb-you-main/README.md
+    add_note: "Run all app commands inside climb-you-main directory."
+
+nice_to_have:
+  - id: NH-new-arch-toggle
+    description: "Disable newArchEnabled if device issues arise; keep enabled by default."
+    file: climb-you-main/app.json
+  - id: NH-store-assets-copy
+    description: "Finalize icons/strings for store submission later; not needed for MVP."
+
+qa_checklist:
+  - area: Install & Build
+    steps:
+      - "cd climb-you-main && npm install"
+      - "npx expo install"
+      - "npx expo-doctor"
+  - area: Boot & Navigation
+    steps:
+      - "npm start"
+      - "Open on device/emulator/web"
+      - "Onboarding flow -> Profile questions -> Quest list"
+  - area: Local Persistence
+    steps:
+      - "Add a task via AddTask tab"
+      - "Restart app and verify task persists (AsyncStorage)"
+  - area: AI Fallbacks
+    steps:
+      - "Unset OPENAI key and confirm static options appear"
+      - "Ensure no blocking errors in console"
+
+env_defaults:
+  demo:
+    EXPO_PUBLIC_DEMO_MODE: "true"
+    EXPO_PUBLIC_USE_MOCK_AI: "true"
+    EXPO_PUBLIC_ENABLE_AI_FEATURES: "false"
+    EXPO_PUBLIC_FIREBASE_USE_EMULATOR: "true"
+  production:
+    EXPO_PUBLIC_DEMO_MODE: "false"
+    EXPO_PUBLIC_ENABLE_AI_FEATURES: "true"
+    EXPO_PUBLIC_USE_MOCK_AI: "false"
+    # EXPO_PUBLIC_OPENAI_API_KEY: "sk-..."
+
+commands:
+  align_dependencies: "cd climb-you-main && npx expo install && npx expo-doctor"
+  typecheck: "cd climb-you-main && npx tsc -p tsconfig.json --noEmit"
+  run_demo: "cd climb-you-main && npm start"
+
+status:
+  MF-android-package-id: pending
+  MF-expo-deps-alignment: pending
+  MF-service-signature-mismatch: pending
+  MF-schema-duplication-check: pending
+  SD-demo-env-defaults: pending
+  SD-openai-fallback-ux: pending
+  SD-regex-hardening: pending
+  SD-readme-cd-path: pending
+

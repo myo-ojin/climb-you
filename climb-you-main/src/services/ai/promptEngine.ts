@@ -362,8 +362,20 @@ export function buildPolicyCheckPrompt(args: {
   constraints: Constraints;
 }): string {
   const { questsCandidate, constraints } = args;
-  return `次の quests[] を審査し、制約違反・重複・モード偏りを検出して修正案を出し、最終版を JSON で返してください。
-修正時は元の目的を保ちつつ pattern/minutes を微調整してください。
+  return `T-HOTFIX-06: PolicyCheckスコープを制約検証とフィールド補完に限定
+
+次のquests[]を審査し、以下の点のみ修正してください：
+
+【責任範囲 - 制限的PolicyCheck】
+1. env_constraintsとhard_constraints違反の検出（パターン変更は不要、既に事前適用済み）
+2. 連続する同じpatternの回避（連続のみ、多様性は考慮不要）
+3. 不足フィールドの補完（done_definition、evidence、alt_plan、stop_rule）
+
+【修正禁止事項 - enhancedQuestServiceが担当】
+- ❌ 時間調整（minutes変更）
+- ❌ 難易度調整  
+- ❌ クエスト数変更
+- ❌ モード偏りの調整
 
 入力:
 <QUESTS_CANDIDATE>${JSON.stringify({ quests: questsCandidate })}</QUESTS_CANDIDATE>
@@ -371,8 +383,8 @@ export function buildPolicyCheckPrompt(args: {
 
 出力フォーマット:
 {
-  "quests": [ /* 3–5件 */ ],
-  "rationale": ["修正理由を箇条書き"]
+  "quests": [ /* 元と同じ件数、minutesは変更不可 */ ],
+  "rationale": ["制約違反・連続パターン・不足フィールドの修正理由のみ"]
 }`;
 }
 

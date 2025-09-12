@@ -18,7 +18,7 @@ const API_CONFIG = {
   // フォールバック設定
   ENABLE_AI_FEATURES: process.env.EXPO_PUBLIC_ENABLE_AI_FEATURES === 'true',
   DEBUG_API_CALLS: process.env.EXPO_PUBLIC_DEBUG_API_CALLS === 'true',
-  USE_MOCK_AI: true, // 🎭 Mock モード有効化 (API クォータ対策)
+  USE_MOCK_AI: process.env.EXPO_PUBLIC_USE_MOCK_AI !== 'false', // 🎭 Default to mock mode unless explicitly disabled
 };
 
 class APIKeyManager {
@@ -67,10 +67,33 @@ class APIKeyManager {
   }
 
   /**
-   * AI機能の有効性チェック
+   * AI機能の有効性チェック - CFG_ai_switch: Auto-enable when keys present
    */
   isAIEnabled(): boolean {
-    return API_CONFIG.ENABLE_AI_FEATURES && !!this.getOpenAIKey();
+    const hasValidKey = !!this.getOpenAIKey();
+    const explicitlyEnabled = API_CONFIG.ENABLE_AI_FEATURES;
+    
+    // Auto-enable AI if valid key is present (even if ENABLE_AI_FEATURES is false)
+    const autoEnabled = hasValidKey;
+    
+    if (API_CONFIG.DEBUG_API_CALLS) {
+      console.log('🤖 AI Feature Check:', {
+        hasValidKey,
+        explicitlyEnabled,
+        autoEnabled: autoEnabled && !API_CONFIG.USE_MOCK_AI,
+        useMockAI: API_CONFIG.USE_MOCK_AI,
+        finalResult: explicitlyEnabled || autoEnabled
+      });
+    }
+    
+    return explicitlyEnabled || autoEnabled;
+  }
+
+  /**
+   * CFG_ai_switch: Should use real AI (not mock)
+   */
+  shouldUseRealAI(): boolean {
+    return this.isAIEnabled() && !API_CONFIG.USE_MOCK_AI && !!this.getOpenAIKey();
   }
 
   /**

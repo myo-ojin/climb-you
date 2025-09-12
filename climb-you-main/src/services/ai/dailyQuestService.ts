@@ -8,6 +8,7 @@ import { Quest, ProfileV1, OnboardingInput } from '../../types/questGeneration';
 import { InputSanitizer } from '../../utils/inputSanitizer';
 import { MemoryManager } from '../../utils/memoryManager';
 import { ConcurrencyManager } from '../../utils/concurrencyManager';
+import { firestoreService } from '../firebase/firestoreService';
 
 export interface UserProfile {
   userId: string;
@@ -79,7 +80,7 @@ export class DailyQuestService {
   }
 
   /**
-   * Generate quests for a specific date
+   * Generate quests for a specific date - PR4: Wire completion → pattern update → next-day generation
    */
   async generateQuestsForDate(
     request: DailyQuestRequest,
@@ -87,8 +88,38 @@ export class DailyQuestService {
     recentHistory: QuestHistory[] = []
   ): Promise<DailyQuestResult> {
     try {
-      // Analyze recent performance to adjust difficulty
-      const performanceAnalysis = this.analyzeRecentPerformance(recentHistory);
+      // PR4: Fetch recent history from DB (7-30 days) with fallback to local when offline
+      let actualRecentHistory = recentHistory;
+      if (recentHistory.length === 0) {
+        try {
+          console.log('📚 Fetching recent quest history from database...');
+          const recentProgress = await firestoreService.getUserProgress(request.userId, 30);
+          const recentQuests = await firestoreService.getUserQuests(request.userId, 'completed');
+          
+          // Convert database data to QuestHistory format
+          actualRecentHistory = recentQuests
+            .filter(quest => quest.completedAt) // Only completed quests
+            .slice(0, 30) // Last 30 quests
+            .map(quest => ({
+              date: quest.completedAt ? new Date(quest.completedAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+              questId: quest.id,
+              wasSuccessful: quest.outcome?.completionQuality ? quest.outcome.completionQuality > 0.5 : true,
+              actualMinutes: quest.outcome?.timeSpent || quest.minutes || 30,
+              targetMinutes: quest.minutes || 30,
+              pattern: quest.pattern || 'general',
+              userRating: quest.outcome?.difficulty_rating ? Math.round(quest.outcome.difficulty_rating * 5) as (1 | 2 | 3 | 4 | 5) : undefined,
+              completedAt: quest.completedAt ? new Date(quest.completedAt).getTime() : new Date().getTime(),
+            }));
+
+          console.log(`📊 Loaded ${actualRecentHistory.length} recent quest completions for next-day generation`);
+        } catch (dbError) {
+          console.warn('⚠️ Failed to fetch recent history from DB, using provided history:', dbError);
+          // Fall back to provided history or empty array
+        }
+      }
+
+      // Analyze recent performance to adjust difficulty (now uses DB data)
+      const performanceAnalysis = this.analyzeRecentPerformance(actualRecentHistory);
       const contextualAdjustments = this.determineContextualAdjustments(
         request.targetDate,
         userProfile.learningPatterns,
@@ -106,10 +137,12 @@ export class DailyQuestService {
       const questResult = await this.enhancedQuestService.generateOptimizedQuestsWithTimeConstraints({
         goalText: userProfile.goalData.goal_text,
         profile: userProfile.profileV1,
-        timeBudgetMinutes: questConfig.totalMinutes,
-        questCount: questConfig.questCount,
-        difficultyRange: questConfig.difficultyRange,
-        avoidRecentPatterns: this.getRecentPatterns(recentHistory, 7), // Avoid patterns used in last 7 days
+        checkins: {
+          mood_energy: 'mid',
+          available_time_today_delta_min: 0,
+          focus_noise: 'mid',
+          day_type: 'normal'
+        }
       });
 
       // Apply adaptive adjustments
@@ -126,7 +159,7 @@ export class DailyQuestService {
         adaptiveAdjustments: contextualAdjustments.adjustmentReasons,
         estimatedDifficulty: questConfig.averageDifficulty,
         totalMinutes: adjustedQuests.reduce((sum, quest) => sum + quest.minutes, 0),
-        generatedAt: Date.now(),
+        generatedAt: new Date().getTime(),
       };
 
     } catch (error) {
@@ -144,7 +177,7 @@ export class DailyQuestService {
   ): Promise<LearningPattern> {
     const recentHistory = completedQuests.filter(quest => {
       const questDate = new Date(quest.date);
-      const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // Last 30 days
+      const cutoff = new Date(new Date().getTime() - 30 * 24 * 60 * 60 * 1000); // Last 30 days
       return questDate >= cutoff;
     });
 
@@ -218,7 +251,7 @@ export class DailyQuestService {
       preferredDifficulty: Math.max(0.2, Math.min(0.8, preferredDifficulty)), // Clamp between 0.2-0.8
       weeklyTrends,
       improvementAreas,
-      lastAnalyzed: Date.now(),
+      lastAnalyzed: new Date().getTime(),
     };
 
     // TODO: Save to database
@@ -238,7 +271,75 @@ export class DailyQuestService {
   }
 
   /**
-   * Mark a quest as completed
+   * Record daily quest completion - PR4: Wire completion → pattern update → next-day generation
+   */
+  async recordDailyQuestCompletion(
+    userId: string,
+    questId: string,
+    completionData: {
+      completedAt: number;
+      actualMinutes: number;
+      wasSuccessful: boolean;
+      userRating?: 1 | 2 | 3 | 4 | 5;
+      difficultyRating?: number; // 0-1, user's difficulty rating
+      userNotes?: string;
+    }
+  ): Promise<void> {
+    try {
+      console.log('🔄 Recording quest completion and updating learning patterns...', { userId, questId });
+
+      // 1. Update quest status in database
+      await firestoreService.updateQuestStatus(userId, questId, 'completed', {
+        completionQuality: completionData.wasSuccessful ? 0.8 : 0.3,
+        timeSpent: completionData.actualMinutes,
+        userNotes: completionData.userNotes,
+        difficulty_rating: completionData.difficultyRating,
+      });
+
+      // 2. Update daily progress
+      const today = new Date().toISOString().split('T')[0];
+      const progressUpdate = {
+        date: today,
+        dailyStats: {
+          questsCompleted: 1, // Increment by 1
+          totalMinutes: completionData.actualMinutes,
+          sessionCount: 1,
+          averageQuality: completionData.wasSuccessful ? 0.8 : 0.3,
+          skillAtomsProgressed: [], // TODO: Extract from quest data
+        },
+        mountainProgress: {
+          todayClimb: completionData.actualMinutes * (completionData.wasSuccessful ? 1.2 : 0.8),
+        }
+      };
+
+      await firestoreService.updateDailyProgress(userId, progressUpdate);
+
+      // 3. Update learning patterns based on completion
+      const questHistory: QuestHistory = {
+        date: today,
+        questId,
+        wasSuccessful: completionData.wasSuccessful,
+        actualMinutes: completionData.actualMinutes,
+        targetMinutes: 30, // TODO: Get from original quest
+        pattern: 'general', // TODO: Get from original quest
+        userRating: completionData.userRating,
+        completedAt: completionData.completedAt,
+      };
+
+      // Update learning patterns asynchronously
+      this.updateLearningPattern(userId, [questHistory])
+        .catch(error => console.warn('Learning pattern update failed:', error));
+
+      console.log('✅ Quest completion recorded successfully');
+
+    } catch (error) {
+      console.error('❌ Error recording quest completion:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Mark a quest as completed (legacy method - redirects to recordDailyQuestCompletion)
    */
   async markQuestCompleted(
     userId: string,
@@ -250,11 +351,7 @@ export class DailyQuestService {
       userRating?: 1 | 2 | 3 | 4 | 5;
     }
   ): Promise<void> {
-    // TODO: Implement database update
-    console.log('Marking quest completed:', userId, questId, completionData);
-    
-    // Trigger learning pattern update after completion
-    // This would typically be done asynchronously
+    return this.recordDailyQuestCompletion(userId, questId, completionData);
   }
 
   // Private helper methods
@@ -262,7 +359,7 @@ export class DailyQuestService {
   private analyzeRecentPerformance(recentHistory: QuestHistory[]) {
     const last7Days = recentHistory.filter(quest => {
       const questDate = new Date(quest.date);
-      const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const cutoff = new Date(new Date().getTime() - 7 * 24 * 60 * 60 * 1000);
       return questDate >= cutoff;
     });
 
@@ -367,7 +464,7 @@ export class DailyQuestService {
   }
 
   private getRecentPatterns(history: QuestHistory[], days: number): string[] {
-    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const cutoff = new Date(new Date().getTime() - days * 24 * 60 * 60 * 1000);
     return history
       .filter(quest => new Date(quest.date) >= cutoff)
       .map(quest => quest.pattern)
@@ -439,3 +536,6 @@ export class DailyQuestService {
     return areas.slice(0, 3); // Limit to top 3 areas
   }
 }
+
+// Create and export singleton instance for convenience
+export const dailyQuestService = new DailyQuestService();

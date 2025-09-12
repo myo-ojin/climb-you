@@ -1,0 +1,125 @@
+{
+  "category": "language",
+  "examples": [
+    {
+      "id": "lang_quest_1",
+      "goal_text": "英会話で日常会話ができるようになりたい",
+      "user_profile": {
+        "learning_level": "beginner",
+        "time_budget_min_per_day": 60,
+        "preferred_study_times": ["morning", "evening"]
+      },
+      "generated_quests": [
+        {
+          "title": "基本挨拶フレーズの発音練習",
+          "pattern": "shadowing",
+          "minutes": 30,
+          "difficulty": 0.2,
+          "deliverable": "10個の挨拶フレーズ習得",
+          "tags": ["english", "pronunciation", "greetings"],
+          "done_definition": "音声に合わせて正確にシャドーイングできる",
+          "evidence": ["練習記録", "発音改善点メモ"],
+          "alt_plan": "短いセクションのみ練習",
+          "stop_rule": "30分経過したら、現在の進捗で一旦終了。理解度が50%未満の場合は基礎に戻る。"
+        },
+        {
+          "title": "自己紹介文の作成と暗記",
+          "pattern": "build_micro",
+          "minutes": 30,
+          "difficulty": 0.3,
+          "deliverable": "1分間の自己紹介文",
+          "tags": ["english", "self-introduction", "speaking"],
+          "done_definition": "動作する1分間の自己紹介文を完成させ、スムーズに発表できる",
+          "evidence": ["動作確認スクリーンショット", "完成した自己紹介文"],
+          "alt_plan": "最小限の機能のみ実装する",
+          "stop_rule": "30分経過したら、現在の進捗で一旦終了。エラーが3回以上続いたら別のアプローチを検討。"
+        }
+      ],
+      "rationale": "初心者なので発音基礎とアウトプット練習を組み合わせ、実用的な英会話スキルの基盤を作ります。"
+    },
+    {
+      "id": "lang_quest_2",
+      "goal_text": "TOEICで750点を取りたい",
+      "user_profile": {
+        "learning_level": "intermediate", 
+        "time_budget_min_per_day": 90,
+        "preferred_study_times": ["morning"]
+      },
+      "generated_quests": [
+        {
+          "title": "Part 5文法問題の解法パターン習得",
+          "pattern": "past_paper",
+          "minutes": 45,
+          "difficulty": 0.5,
+          "deliverable": "文法問題20問の解答と解説",
+          "tags": ["toeic", "grammar", "part5"],
+          "done_definition": "問題を完了し、答え合わせと振り返りを行う",
+          "evidence": ["解答用紙", "振り返りメモ"],
+          "alt_plan": "解ける問題のみ選んで挑戦",
+          "stop_rule": "45分経過したら、現在の進捗で一旦終了。理解度が50%未満の場合は基礎に戻る。"
+        },
+        {
+          "title": "リスニングPart 3・4の先読み技術",
+          "pattern": "flashcards",
+          "minutes": 45,
+          "difficulty": 0.6,
+          "deliverable": "先読みキーワード単語帳",
+          "tags": ["toeic", "listening", "technique"],
+          "done_definition": "フラッシュカードを完成させ、80%以上正答できる",
+          "evidence": ["完成したフラッシュカード", "正答率記録"],
+          "alt_plan": "5-10枚に絞って集中的に練習",
+          "stop_rule": "45分経過したら、現在の進捗で一旦終了。理解度が50%未満の場合は基礎に戻る。"
+        }
+      ],
+      "rationale": "TOEIC 750点目標なので実践的な解法テクニックに焦点。文法とリスニングの重要パートを効率的に強化します。"
+    },
+    {
+      "id": "lang_quest_3",
+      "goal_text": "ビジネス英語でプレゼンテーションができるようになりたい",
+      "user_profile": {
+        "learning_level": "advanced",
+        "time_budget_min_per_day": 120,
+        "preferred_study_times": ["morning", "evening"]
+      },
+      "generated_quests": [
+        {
+          "title": "効果的なオープニングフレーズ集作成",
+          "pattern": "build_micro",
+          "minutes": 40,
+          "difficulty": 0.6,
+          "deliverable": "状況別オープニング10パターン",
+          "tags": ["business-english", "presentation", "opening"],
+          "done_definition": "動作する状況別オープニング10パターンを完成させ、デモ実行する",
+          "evidence": ["動作確認スクリーンショット", "完成したフレーズ集"],
+          "alt_plan": "最小限の機能のみ実装する",
+          "stop_rule": "40分経過したら、現在の進捗で一旦終了。エラーが3回以上続いたら別のアプローチを検討。"
+        },
+        {
+          "title": "データ説明時の表現パターン練習",
+          "pattern": "feynman",
+          "minutes": 40,
+          "difficulty": 0.7,
+          "deliverable": "グラフ・数値説明テンプレート",
+          "tags": ["business-english", "data", "explanation"],
+          "done_definition": "概念を誰かに教えられるレベルで説明できる",
+          "evidence": ["説明メモ", "理解度の自己評価"],
+          "alt_plan": "1つの概念に絞って説明練習",
+          "stop_rule": "40分経過したら、現在の進捗で一旦終了。理解度が50%未満の場合は基礎に戻る。"
+        },
+        {
+          "title": "質疑応答での適切な対応方法",
+          "pattern": "socratic",
+          "minutes": 40,
+          "difficulty": 0.6,
+          "deliverable": "Q&A対応フレーズ集",
+          "tags": ["business-english", "qa", "interaction"],
+          "done_definition": "質問に答えを出し、さらなる疑問点を3つ見つける",
+          "evidence": ["質問と答えのリスト", "新たな疑問点リスト"],
+          "alt_plan": "1つの質問に深く掘り下げる", 
+          "stop_rule": "40分経過したら、現在の進捗で一旦終了。理解度が50%未満の場合は基礎に戻る。"
+        }
+      ],
+      "rationale": "上級者向けビジネスプレゼンテーション。オープニング・データ説明・質疑応答の3つの重要要素を40分ずつで体系的に習得します。"
+    }
+  ]
+}
